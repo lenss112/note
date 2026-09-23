@@ -458,7 +458,16 @@ let V={tab:"today",filter:"all",month:today().slice(0,7),sel:today(),q:"",showDo
 function lsGet(k){try{const v=localStorage.getItem("hub:"+k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem("hub:"+k,JSON.stringify(v))}catch(e){}}
 KEYS.forEach(k=>{const v=lsGet(k);if(Array.isArray(v))S[k]=v});
+const DEFAULT_API="https://script.google.com/macros/s/AKfycbxtTdawaxliNGjGsWff5wkrBUe06PKgvc0pWE6Lb0xp0AICYhVxYF-3UCMPXN7Dy-l42w/exec";
 const CFG={url:lsGet("api")||"",token:lsGet("token")||""};
+let FIRST_CONNECT=false;
+(()=>{ // 주소 끝에 #t=토큰 을 붙여 열면 이 기기에 자동 연결
+  const m=location.hash.match(/[#&]t=([^&]+)/);
+  if(!m)return;
+  CFG.token=decodeURIComponent(m[1]).trim();CFG.url=CFG.url||DEFAULT_API;
+  lsSet("token",CFG.token);lsSet("api",CFG.url);FIRST_CONNECT=true;
+  try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}
+})();
 
 /* ---------- spreadsheet sync (Apps Script web app) ---------- */
 const snap=a=>{const m={};a.forEach(x=>m[x.id]=JSON.stringify(x));return m};
@@ -779,8 +788,8 @@ function vSettings(){
   const st=!CFG.url?"연결 안 됨 · 이 기기에만 저장 중":NET.state==="ok"?`연결됨 · 마지막 동기화 ${hm(NET.at)}`:NET.state==="err"?NET.msg:"연결 확인 중…";
   return `<div class="settings">
   <h2 style="margin-top:4px">스프레드시트 연결</h2>
-  <p>Apps Script를 웹 앱으로 배포하고 받은 주소와, 스프레드시트 '안내' 탭의 토큰을 넣어 주세요. 기기마다 한 번씩만 하면 돼요.</p>
-  <div class="field"><label for="s_url">웹 앱 주소</label><input id="s_url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(CFG.url)}" autocomplete="off"></div>
+  <p>웹 앱 주소는 미리 넣어 두었어요. 스프레드시트 '안내' 탭의 토큰만 넣고 연결하기를 누르세요. 기기마다 한 번씩만 하면 돼요.</p>
+  <div class="field"><label for="s_url">웹 앱 주소</label><input id="s_url" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(CFG.url||DEFAULT_API)}" autocomplete="off"></div>
   <div class="field"><label for="s_tok">토큰</label><input id="s_tok" placeholder="안내 탭의 토큰" value="${esc(CFG.token)}" autocomplete="off"></div>
   <div class="rowbtns"><button class="btn primary" data-connect>연결하기</button>${CFG.url?`<button class="btn ghost" data-disconnect>연결 해제</button>`:""}</div>
   <div class="result ${NET.state==="ok"?"ok":NET.state==="err"?"err":""}" id="s_res">${NET.state==="ok"&&CFG.url?kit("k_wink"):""}${esc(st)}</div>
@@ -930,7 +939,7 @@ document.addEventListener("visibilitychange",()=>{
 });
 window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
-if(CFG.url)loadAll();
+if(CFG.url)loadAll({first:FIRST_CONNECT});
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
