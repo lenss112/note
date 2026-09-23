@@ -1,6 +1,6 @@
 // 은지의 하루 — 앱 껍데기를 기기에 저장해서 오프라인에서도 열리게 해요.
 // 데이터(스프레드시트·캘린더) 요청은 건드리지 않아요.
-const VERSION = "hub-v6";
+const VERSION = "hub-v9";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
