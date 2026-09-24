@@ -245,6 +245,9 @@ a.row{color:inherit;text-decoration:none}
 .topbar .ttl{flex:1;font-family:"Kiwi Maru","Jua",serif;font-weight:500;font-size:19px;color:var(--rose-deep)}
 .sync{border:0;background:none;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);padding:8px 10px;border-radius:10px}
 .sync i{width:8px;height:8px;border-radius:50%;background:var(--soft)}
+.sync{position:relative;font-variant-numeric:tabular-nums}
+.sync .pg{position:absolute;left:10px;right:10px;bottom:2px;height:3px;border-radius:2px;background:var(--line);overflow:hidden;display:none}
+.sync.busy .pg{display:block} .sync .pg b{display:block;height:100%;width:0;background:var(--work);border-radius:2px;transition:width .25s linear}
 .sync.ok i{background:var(--play)} .sync.busy i{background:var(--work)} .sync.err i{background:var(--warn)} .sync.err{color:var(--warn)}
 .drawer-scrim{position:fixed;inset:0;background:rgba(120,30,70,.25);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
 .drawer{position:fixed;top:0;bottom:0;left:0;width:min(280px,82vw);z-index:51;background:var(--panel);border-right:1px solid var(--line);
@@ -430,7 +433,7 @@ h2 .ic.hic{width:22px;height:22px;vertical-align:-4px}
 <header class="topbar">
   <button class="burger" id="burger" aria-label="메뉴 열기" aria-expanded="false" aria-controls="drawer"><span></span></button>
   <div class="ttl" id="ttl">姫の手帳</div>
-  <button class="sync" id="sync" aria-label="동기화 상태, 눌러서 새로고침"><i></i><span></span></button>
+  <button class="sync" id="sync" aria-label="동기화 상태, 눌러서 새로고침"><i></i><span></span><em class="pg"><b></b></em></button>
 </header>
 <div class="drawer-scrim" id="dscrim"></div>
 <aside class="drawer" id="drawer" aria-hidden="true" aria-label="메뉴">
@@ -548,7 +551,7 @@ function save(k){
 }
 async function flush(){
   if(!CFG.url||flushing||!queue.length)return;
-  flushing=true;
+  flushing=true;NET.mode="save";
   const batch=queue.splice(0);
   const m=new Map();batch.forEach(o=>m.set(o.key+"|"+(o.item?o.item.id:o.id),o));
   NET.state="busy";paintSync();
@@ -559,10 +562,11 @@ async function flush(){
 }
 async function loadAll(opts={}){
   if(!CFG.url||loading)return;
-  loading=true;NET.state="busy";paintSync();
-  gLoad(true,!!opts.force);   // 캘린더는 시트와 동시에 불러와요
+  loading=true;NET.state="busy";NET.mode="load";NET.t0=Date.now();NET.done=0;NET.total=2;paintSync();
+  const calP=Promise.resolve(gLoad(true,!!opts.force)).catch(()=>{}).finally(()=>{NET.done++;paintSync()});   // 캘린더는 시트와 동시에 불러와요
   try{
     if(queue.length){await flush();if(queue.length)throw{code:"pending"}}
+    NET.state="busy";NET.mode="load";paintSync();
     let j=null;const ep=window.__EARLY_LOAD;window.__EARLY_LOAD=null;
     if(ep&&!opts.force){try{j=await readJson(await ep)}catch(e){j=null}}
     if(!j)j=await apiGet({action:"load"});
@@ -576,8 +580,11 @@ async function loadAll(opts={}){
     }
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
-    NET.state="ok";NET.msg="";NET.at=Date.now();
     NET.imported=j.imported||0;
+    NET.done++;render();          // 시트 내용은 받자마자 먼저 보여줘요
+    await calP;
+    const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
+    NET.state="ok";NET.msg="";NET.at=Date.now();
   }catch(e){if(!(e&&e.code==="pending")){NET.state="err";NET.msg=errMsg(e)}}
   loading=false;render();
 }
@@ -623,7 +630,14 @@ function paintSync(){
   const b=document.getElementById("sync");if(!b)return;
   const st=NET.state;
   b.className="sync "+(st==="ok"?"ok":st==="busy"?"busy":st==="err"?"err":"");
-  b.querySelector("span").textContent=st==="ok"?"동기화됨":st==="busy"?"저장 중":st==="err"?"연결 오류":"이 기기만";
+  const load=st==="busy"&&NET.mode==="load";
+  b.querySelector("span").textContent=st==="ok"?"동기화됨":st==="busy"?(load?`불러오는 중 ${NET.done}/${NET.total} · ${Math.floor((Date.now()-NET.t0)/1000)}초`:"저장 중"):st==="err"?"연결 오류":"이 기기만";
+  // 진행 막대: 지난번 걸린 시간을 기준으로 채우고, 끝나기 전에는 95%에서 멈춰요
+  const est=lsGet("loadMs")||3000,el=Date.now()-(NET.t0||Date.now());
+  const pct=load?Math.max(NET.done/NET.total,Math.min(0.95,el/est))*100:st==="busy"?60:100;
+  b.querySelector(".pg b").style.width=pct+"%";
+  if(st==="busy"&&!window.__syncTick)window.__syncTick=setInterval(paintSync,250);
+  if(st!=="busy"&&window.__syncTick){clearInterval(window.__syncTick);window.__syncTick=null}
 }
 function renderChrome(){
   document.title=SITE.title;
