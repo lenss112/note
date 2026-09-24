@@ -869,8 +869,7 @@ function vToday(){
       ${todos.length?todos.map(duoTd).join(""):`<div class="dempty">${kit("k_sleep")}오늘 할 일 없음<br><button data-add="todo">추가</button></div>`}</section>
     <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
       ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
-        <div class="body"><div class="t">${esc(x.title)}</div></div>
-        <button class="xbtn" data-shopdel="${x.id}" aria-label="삭제">×</button></div>`).join("")}</section>
+        <div class="body"><div class="t">${esc(x.title)}</div></div></div>`).join("")}</section>
   </div>
   ${S.habits.length?`<h2>오늘의 루틴 <small>${S.habits.filter(x=>x.log?.[td]).length}/${S.habits.length}</small></h2>
   <div class="qh">${S.habits.map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>
