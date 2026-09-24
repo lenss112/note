@@ -244,7 +244,7 @@ function fromRow_(key, r) {
     else if (TIME_FIELDS.indexOf(f) >= 0) o[f] = parseStamp_(v);
     else if (f === 'log') { o.log = {}; v.split(/[,\s]+/).map(normDate_).filter(Boolean).forEach(d => o.log[d] = true); }
     else if (f === 'date' || f === 'due') o[f] = normDate_(v);
-    else if (f === 'time') o[f] = normTime_(v);
+    else if (f === 'time' && key !== 'supps') o[f] = normTime_(v);   // 영양제 시간은 '아침' 같은 글자라 그대로 둠
     else o[f] = v;
   });
   return o;
