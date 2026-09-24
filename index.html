@@ -674,13 +674,8 @@ function wxTip(){ // 기온·비 확률로 옷차림 추천
   if(lo<=0)tips.push("🧤 장갑도 챙기세요");
   return tips.map(t=>`<span>${t}</span>`).join("");
 }
-function wxPos(){ // 위치는 한 번 허락받으면 기억해 두고, 허락이 안 되면 서울 기준
-  return new Promise(res=>{
-    const fb=lsGet("wxpos")||{lat:37.5665,lon:126.978};
-    if(!navigator.geolocation)return res(fb);
-    navigator.geolocation.getCurrentPosition(p=>{const o={lat:+p.coords.latitude.toFixed(3),lon:+p.coords.longitude.toFixed(3)};lsSet("wxpos",o);res(o)},
-      ()=>res(fb),{maximumAge:3*3600e3,timeout:8000,enableHighAccuracy:false});
-  });
+function wxPos(){ // 위치 정보는 받지 않고 항상 서울 기준
+  return Promise.resolve({lat:37.5665,lon:126.978});
 }
 let wxBusy=false;
 async function wxLoad(){
