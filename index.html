@@ -423,6 +423,9 @@ h2::before,.duo h3::before{content:"";width:16px;height:16px;background:var(--he
 .dateline .kd{width:44px;height:44px;margin-left:auto}
 .dateline .wx{display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
 .dateline{white-space:nowrap}
+.dateline{margin-bottom:6px}
+.wxtip{display:flex;flex-wrap:wrap;gap:6px;margin:0 2px 12px;font-size:13px}
+.wxtip span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ink)}
 @media (max-width:480px){.dateline .wx{font-size:15px;gap:3px}.dateline .wx small{font-size:11px}.dateline .wx .ic{width:18px;height:18px}.dateline{gap:4px}}
 @media (max-width:360px){.dateline .wx small{display:none}}
 .dateline .wx small{font-family:"Gowun Dodum",sans-serif;font-size:13px;color:var(--soft);font-weight:400}
@@ -655,6 +658,22 @@ function wxHtml(){
   const[icn,txt]=wxInfo(WX.code,WX.day);
   return `${ic(icn)}${txt} ${Math.round(WX.t)}° <small>${Math.round(WX.lo)}°/${Math.round(WX.hi)}°${WX.pop!=null?` · 비 ${WX.pop}%`:""}</small>`;
 }
+function wxTip(){ // 기온·비 확률로 옷차림 추천
+  if(!WX)return"";
+  const hi=WX.hi,lo=WX.lo,pop=WX.pop??0,c=WX.code,tips=[];
+  const wear=hi>=28?"민소매·반팔, 최대한 시원하게":hi>=23?"반팔·얇은 셔츠":hi>=20?"얇은 긴팔·면바지":hi>=17?"맨투맨·얇은 니트·가디건":
+    hi>=12?"자켓·가디건·니트":hi>=9?"트렌치코트·야상":hi>=5?"코트·히트텍":"패딩·목도리 꽁꽁";
+  tips.push(`👗 ${wear}`);
+  const rainNow=(c>=51&&c<=67)||(c>=80&&c<=82)||c>=95;
+  if(rainNow||pop>=60)tips.push("☂️ 우산 꼭 챙기세요");
+  else if(pop>=30)tips.push("🌂 작은 우산 챙기면 좋아요");
+  if((c>=71&&c<=77)||c===85||c===86)tips.push("⛄ 눈 와요, 미끄럼 조심");
+  if(hi-lo>=8&&lo<20)tips.push("🧥 아침저녁 쌀쌀해요, 겉옷 챙기세요");
+  else if(lo<12&&hi>=17)tips.push("🧥 얇은 겉옷 하나 챙기세요");
+  if(hi>=30)tips.push("💧 더워요, 물 챙기세요");
+  if(lo<=0)tips.push("🧤 장갑도 챙기세요");
+  return tips.map(t=>`<span>${t}</span>`).join("");
+}
 function wxPos(){ // 위치는 한 번 허락받으면 기억해 두고, 허락이 안 되면 서울 기준
   return new Promise(res=>{
     const fb=lsGet("wxpos")||{lat:37.5665,lon:126.978};
@@ -675,6 +694,7 @@ async function wxLoad(){
         hi:j.daily.temperature_2m_max[0],lo:j.daily.temperature_2m_min[0],pop:j.daily.precipitation_probability_max?.[0]??null};
     lsSet("wx",WX);
     const el=document.getElementById("wx");if(el)el.innerHTML=wxHtml();
+    const tp=document.getElementById("wxtip");if(tp){tp.innerHTML=wxTip();tp.hidden=!WX}
   }catch(e){}
   wxBusy=false;
 }
@@ -841,6 +861,7 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline">${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 <span class="wx" id="wx">${wxHtml()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
+  <p class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</p>
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
