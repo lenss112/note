@@ -2,6 +2,19 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>/* 페이지를 다 읽기 전에 시트·캘린더 요청부터 먼저 보내요 */
+(function(){try{
+  var g=function(k){var v=localStorage.getItem("hub:"+k);return v?JSON.parse(v):null};
+  var u=g("api"),t=g("token"),q=g("queue");
+  if(!u||!t||/[#&]t=/.test(location.hash))return;
+  var get=function(p){var U=new URL(u);for(var k in p)U.searchParams.set(k,p[k]);U.searchParams.set("token",t);return fetch(U.toString(),{redirect:"follow"})};
+  if(!(q&&q.length))window.__EARLY_LOAD=get({action:"load"});
+  var p2=function(n){return("0"+n).slice(-2)},ymd=function(d){return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())};
+  var n=new Date(),y=n.getFullYear(),m=n.getMonth()+1;
+  var a=new Date(y,m-2,1);a.setDate(1-a.getDay());var b=new Date(y,m+1,1);b.setDate(b.getDate()+14);
+  var A=ymd(a),B=ymd(b);window.__EARLY_GCAL={key:A+B,res:get({action:"gcal",from:A,to:B})};
+}catch(e){}})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -550,7 +563,9 @@ async function loadAll(opts={}){
   gLoad(true,!!opts.force);   // 캘린더는 시트와 동시에 불러와요
   try{
     if(queue.length){await flush();if(queue.length)throw{code:"pending"}}
-    const j=await apiGet({action:"load"});
+    let j=null;const ep=window.__EARLY_LOAD;window.__EARLY_LOAD=null;
+    if(ep&&!opts.force){try{j=await readJson(await ep)}catch(e){j=null}}
+    if(!j)j=await apiGet({action:"load"});
     if(queue.length){loading=false;return}
     const d=j.data||{};
     const sheetEmpty=KEYS.every(k=>!(d[k]||[]).length),localHas=KEYS.some(k=>S[k].length);
@@ -591,7 +606,9 @@ async function gLoad(force,nocache){
   const[a,b]=gWindow(),key=a+b+(nocache?"!":"");G.key=key;
   if(!covered){G.state="loading";render()}
   try{
-    const j=await apiGet({action:"gcal",from:a,to:b,...(nocache?{nocache:"1"}:{})});
+    const eg=window.__EARLY_GCAL;window.__EARLY_GCAL=null;let j=null;
+    if(eg&&eg.key===a+b&&!nocache){try{j=await readJson(await eg.res)}catch(e){j=null}}
+    if(!j)j=await apiGet({action:"gcal",from:a,to:b,...(nocache?{nocache:"1"}:{})});
     if(G.key!==key)return;
     G.events=(j.events||[]).map(e=>({...e,id:"g_"+e.id,g:true,cat:e.hol?"hol":"g",
       title:e.hol?holKo(e.title):e.title}));
