@@ -90,9 +90,7 @@ function handle_(p) {
       if (p.action === 'load') {
         archiveIfDue_();
         const imported = processInbox_();
-        const data = {};
-        Object.keys(SHEETS).forEach(k => data[k] = readAll_(k));
-        return json_({ ok: true, data: data, site: readSite_(), imported: imported });
+        return json_(Object.assign({ ok: true, imported: imported }, loadFast_()));
       }
       if (p.action === 'ops') {
         (p.ops || []).forEach(o => {
@@ -167,6 +165,39 @@ function readSite_() {
     out[key] = hit && String(hit[1]).trim() ? String(hit[1]).trim() : def;
   });
   return out;
+}
+
+// 시트 목록을 한 번만 가져오고, 탭마다 한 번에 통째로 읽어서 왕복 횟수를 줄여요
+function loadFast_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const byName = {};
+  ss.getSheets().forEach(s => byName[s.getName()] = s);
+  const data = {};
+  Object.keys(SHEETS).forEach(k => {
+    const def = SHEETS[k], s = byName[def.name];
+    if (!s) { data[k] = readAll_(k); return; }             // 탭이 없으면 기존 방식으로 만들면서 읽기
+    const vals = s.getDataRange().getDisplayValues();
+    if ((vals[0] || []).length < def.cols.length) { data[k] = readAll_(k); return; }
+    const out = [];
+    for (let i = 1; i < vals.length; i++) {
+      const r = vals[i].slice(0, def.cols.length);
+      if (r.every(v => String(v).trim() === '')) continue;
+      if (!r[0]) { r[0] = newId_(); s.getRange(i + 1, 1).setNumberFormat('@').setValue(r[0]); }
+      out.push(fromRow_(k, r));
+    }
+    data[k] = out;
+  });
+  let site;
+  const ssite = byName[SITE_SHEET];
+  if (ssite) {
+    const vals = ssite.getDataRange().getDisplayValues().slice(1);
+    site = {};
+    SITE_ROWS.forEach(([key, label, def]) => {
+      const hit = vals.find(r => String(r[0]).trim() === label);
+      site[key] = hit && String(hit[1] || '').trim() ? String(hit[1]).trim() : def;
+    });
+  } else site = readSite_();
+  return { data: data, site: site };
 }
 
 function readAll_(key) {
@@ -341,9 +372,14 @@ function nextDay_(d) {
 
 /* ---------------- Claude 인박스 ---------------- */
 function inboxFolder_(create) {
+  // 폴더를 이름으로 찾는 게 느려서, 한 번 찾으면 id를 기억해 두고 바로 열어요
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('INBOX_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { props.deleteProperty('INBOX_ID'); } }
   const it = DriveApp.getFoldersByName(INBOX_FOLDER);
-  if (it.hasNext()) return it.next();
-  return create ? DriveApp.createFolder(INBOX_FOLDER) : null;
+  const f = it.hasNext() ? it.next() : (create ? DriveApp.createFolder(INBOX_FOLDER) : null);
+  if (f) props.setProperty('INBOX_ID', f.getId());
+  return f;
 }
 
 function processInbox_() {
