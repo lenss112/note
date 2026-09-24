@@ -98,6 +98,13 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .cell.out .n{opacity:.35}
 .cell.today .n{background:var(--rose);color:#fff;font-weight:700}
 .cell.sel{background:var(--rose-weak)}
+.cell .lbl.cr{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:-4px}
+.cell .lbl.cl{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:-4px}
+.cell:has(.lbl.cr,.lbl.cl){overflow:visible}
+.cell .lbl.tm{background:none;color:var(--ink);position:relative;padding-left:13px}
+.cell .lbl.tm::before{content:"";position:absolute;left:3px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--pink)}
+.cell .lbl.tm.work::before{background:var(--work)} .cell .lbl.tm.life::before{background:var(--life)} .cell .lbl.tm.play::before{background:var(--play)}
+.cell .lbl.cr,.cell .lbl.cl{max-width:none}
 .cell .dots{display:flex;gap:3px;justify-content:center;flex-wrap:wrap}
 .cell .dots i{width:6px;height:6px;border-radius:50%}
 .cell .lbl{font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 4px;border-radius:4px;display:none}
@@ -697,10 +704,15 @@ function calBlock(f,sel=V.sel){
   const[y,m]=V.month.split("-").map(Number);
   const first=new Date(y,m-1,1),start=new Date(first);start.setDate(1-first.getDay());
   const td=today();let cells="";const AE=allEvents();
+  const evKey=e=>e.cat+"|"+e.title;
+  const dayKeys=ds=>new Set(AE.filter(e=>e.date===ds&&!e.time&&pG(e)&&e.cat!=="hol").map(evKey));
   for(let i=0;i<42;i++){
     const d=new Date(start);d.setDate(start.getDate()+i);const s=ymd(d);
     if(i===35&&d.getMonth()!==m-1)break;
-    const evs=AE.filter(e=>e.date===s&&pG(e)&&e.cat!=="hol").sort(byTime);
+    const pAll=dayKeys(addDays(s,-1)),nAll=dayKeys(addDays(s,1));
+    const pk=i%7===0?new Set():pAll,nk=i%7===6?new Set():nAll;
+    const multi=e=>!e.time&&(pAll.has(evKey(e))||nAll.has(evKey(e)));
+    const evs=AE.filter(e=>e.date===s&&pG(e)&&e.cat!=="hol").sort((a,b)=>(multi(b)-multi(a))||byTime(a,b));
     const hol=AE.filter(e=>e.date===s&&e.cat==="hol");
     const tds=f==="g"?[]:S.todos.filter(t=>t.due===s&&!t.done&&pF(t));
     cells+=`<button class="cell ${d.getMonth()!==m-1?"out":""} ${s===td?"today":""} ${s===sel?"sel":""} ${hol.length?"holiday":""}" data-day="${s}" aria-label="${d.getMonth()+1}월 ${d.getDate()}일, 일정 ${evs.length}개">
@@ -708,7 +720,7 @@ function calBlock(f,sel=V.sel){
       ${(()=>{const st=evs.map(stickerOf).find(Boolean);return st?ic(st,"cstk"):""})()}
       ${hol.slice(0,1).map(e=>`<span class="lbl hol">${ic("sakura")}${esc(e.title)}</span>`).join("")}
       <span class="dots">${evs.slice(0,4).map(e=>`<i class="${e.cat}"></i>`).join("")}${tds.length?'<i style="background:var(--soft)"></i>':""}</span>
-      ${evs.slice(0,3).map(e=>`<span class="lbl ${e.cat}">${esc(e.title)}</span>`).join("")}
+      ${evs.slice(0,3).map(e=>{const k=evKey(e),l=!e.time&&pk.has(k),r=!e.time&&nk.has(k);return `<span class="lbl ${e.cat}${e.time?" tm":""}${l?" cl":""}${r?" cr":""}">${l?"&nbsp;":esc(e.title)}</span>`}).join("")}
       ${evs.length>3?`<span class="lbl" style="display:block;color:var(--soft)">+${evs.length-3}</span>`:""}
     </button>`;
   }
