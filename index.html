@@ -424,9 +424,15 @@ h2::before,.duo h3::before{content:"";width:16px;height:16px;background:var(--he
 .dateline .wx{display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
 .dateline{white-space:nowrap}
 .dateline{margin-bottom:6px}
-.wxtip{display:flex;flex-wrap:wrap;gap:6px;margin:0 2px 12px;font-size:13px}
-.wxtip span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--ink)}
-@media (max-width:480px){.dateline .wx{font-size:15px;gap:3px}.dateline .wx small{font-size:11px}.dateline .wx .ic{width:18px;height:18px}.dateline{gap:4px}}
+.dateline{flex-wrap:nowrap;min-width:0}
+.dateline .dday,.dateline .wx{flex-shrink:0}
+.dateline .dday{color:var(--ink)}
+@media (max-width:420px){.dateline .wx small{display:none}}
+.wxtip{display:inline-flex;gap:4px;min-width:0;overflow:hidden;font-size:12px;font-family:"Gowun Dodum",sans-serif;font-weight:400}
+.wxtip[hidden]{display:none}
+.wxtip span{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1}
+.dateline{margin-bottom:12px}
+@media (max-width:480px){.wxtip{font-size:11px}.wxtip span{padding:2px 6px}.dateline .kd{width:36px;height:36px}.dateline .wx{font-size:15px;gap:3px}.dateline .wx small{font-size:11px}.dateline .wx .ic{width:18px;height:18px}.dateline{gap:4px}}
 @media (max-width:360px){.dateline .wx small{display:none}}
 .dateline .wx small{font-family:"Gowun Dodum",sans-serif;font-size:13px;color:var(--soft);font-weight:400}
 .dempty .kit{width:44px;height:44px;display:block;margin:0 0 4px}
@@ -855,8 +861,7 @@ function vToday(){
   const shopDone=S.shop.filter(x=>x.done).length;
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
-  <p class="dateline">${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 <span class="wx" id="wx">${wxHtml()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
-  <p class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</p>
+  <p class="dateline"><span class="dday">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})</span><span class="wx" id="wx">${wxHtml()}</span><span class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
