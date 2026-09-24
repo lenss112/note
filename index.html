@@ -421,6 +421,11 @@ h2::before,.duo h3::before{content:"";width:16px;height:16px;background:var(--he
 .drawer .kbrand{width:84px;height:84px;margin:0 0 4px 8px}
 .dateline{display:flex;align-items:center;gap:6px}
 .dateline .kd{width:44px;height:44px;margin-left:auto}
+.dateline .wx{display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.dateline{white-space:nowrap}
+@media (max-width:480px){.dateline .wx{font-size:15px;gap:3px}.dateline .wx small{font-size:11px}.dateline .wx .ic{width:18px;height:18px}.dateline{gap:4px}}
+@media (max-width:360px){.dateline .wx small{display:none}}
+.dateline .wx small{font-family:"Gowun Dodum",sans-serif;font-size:13px;color:var(--soft);font-weight:400}
 .dempty .kit{width:44px;height:44px;display:block;margin:0 0 4px}
 .empty .kit{width:40px;height:40px;vertical-align:middle;margin-right:6px}
 .scard{position:relative}
@@ -632,6 +637,48 @@ async function gLoad(force,nocache){
 }
 const allEvents=()=>S.events.concat(G.events);
 
+/* ---------- 오늘의 날씨 (Open-Meteo, 키 없이 무료) ---------- */
+let WX=lsGet("wx");   // {at, t, hi, lo, pop, code, day}
+function wxInfo(c,day){
+  if(c===0)return[day?"sun":"moon","맑음"];
+  if(c<=2)return[day?"sun":"moon","구름 조금"];
+  if(c===3)return["cloud","흐림"];
+  if(c===45||c===48)return["cloud","안개"];
+  if((c>=51&&c<=67)||(c>=80&&c<=82))return["drop",c<=57?"이슬비":"비"];
+  if((c>=71&&c<=77)||c===85||c===86)return["cloud","눈"];
+  if(c>=95)return["drop","뇌우"];
+  return["cloud","흐림"];
+}
+function wxHtml(){
+  const h=new Date().getHours(),day=h>=6&&h<18;
+  if(!WX)return ic(day?"sun":"moon");
+  const[icn,txt]=wxInfo(WX.code,WX.day);
+  return `${ic(icn)}${txt} ${Math.round(WX.t)}° <small>${Math.round(WX.lo)}°/${Math.round(WX.hi)}°${WX.pop!=null?` · 비 ${WX.pop}%`:""}</small>`;
+}
+function wxPos(){ // 위치는 한 번 허락받으면 기억해 두고, 허락이 안 되면 서울 기준
+  return new Promise(res=>{
+    const fb=lsGet("wxpos")||{lat:37.5665,lon:126.978};
+    if(!navigator.geolocation)return res(fb);
+    navigator.geolocation.getCurrentPosition(p=>{const o={lat:+p.coords.latitude.toFixed(3),lon:+p.coords.longitude.toFixed(3)};lsSet("wxpos",o);res(o)},
+      ()=>res(fb),{maximumAge:3*3600e3,timeout:8000,enableHighAccuracy:false});
+  });
+}
+let wxBusy=false;
+async function wxLoad(){
+  if(wxBusy||(WX&&Date.now()-WX.at<30*60e3&&WX.d===today()))return;
+  wxBusy=true;
+  try{
+    const p=await wxPos();
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1`;
+    const j=await (await fetch(u)).json();
+    WX={at:Date.now(),d:today(),t:j.current.temperature_2m,code:j.current.weather_code,day:!!j.current.is_day,
+        hi:j.daily.temperature_2m_max[0],lo:j.daily.temperature_2m_min[0],pop:j.daily.precipitation_probability_max?.[0]??null};
+    lsSet("wx",WX);
+    const el=document.getElementById("wx");if(el)el.innerHTML=wxHtml();
+  }catch(e){}
+  wxBusy=false;
+}
+
 /* ---------- chrome: top bar, drawer, sync badge ---------- */
 function paintSync(){
   const b=document.getElementById("sync");if(!b)return;
@@ -793,15 +840,14 @@ function vToday(){
   const shopDone=S.shop.filter(x=>x.done).length;
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
-  <p class="dateline">${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 ${ic(d.getHours()>=6&&d.getHours()<18?"sun":"moon")}${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
+  <p class="dateline">${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 <span class="wx" id="wx">${wxHtml()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
     <section class="col ctd"><h3>할일 <small>${todos.filter(t=>!t.done).length}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
       ${todos.length?todos.map(duoTd).join(""):`<div class="dempty">${kit("k_sleep")}오늘 할 일 없음<br><button data-add="todo">추가</button></div>`}</section>
     <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
-      <form class="quick" data-quick="shop"><input placeholder="우유, 토너…" aria-label="살 것 추가" autocomplete="off"><button type="submit">추가</button></form>
-      ${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
+      ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
         <div class="body"><div class="t">${esc(x.title)}</div></div>
         <button class="xbtn" data-shopdel="${x.id}" aria-label="삭제">×</button></div>`).join("")}</section>
   </div>
@@ -892,6 +938,7 @@ function render(){
   const m=document.getElementById("main");
   m.innerHTML={today:vToday,cal:vCal,todo:vTodo,note:vNote,habit:vHabit,settings:vSettings}[V.tab]();
   document.getElementById("fab").classList.toggle("hide",V.tab==="settings");
+  if(V.tab==="today")wxLoad();
   const q=document.getElementById("q");
   if(q)q.addEventListener("input",()=>{V.q=q.value;const p=q.selectionStart;render();const n=document.getElementById("q");n.focus();n.setSelectionRange(p,p)});
 }
