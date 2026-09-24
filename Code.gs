@@ -244,7 +244,7 @@ function fromRow_(key, r) {
     else if (TIME_FIELDS.indexOf(f) >= 0) o[f] = parseStamp_(v);
     else if (f === 'log') { o.log = {}; v.split(/[,\s]+/).map(normDate_).filter(Boolean).forEach(d => o.log[d] = true); }
     else if (f === 'date' || f === 'due') o[f] = normDate_(v);
-    else if (f === 'time' && key !== 'supps') o[f] = normTime_(v);   // 영양제 시간은 '아침' 같은 글자라 그대로 둠
+    else if (f === 'time') o[f] = normTime_(v);
     else o[f] = v;
   });
   return o;
@@ -279,9 +279,13 @@ function normDate_(v) {
   if (m) return Utilities.formatDate(new Date(), TZ, 'yyyy') + '-' + pad_(m[1]) + '-' + pad_(m[2]);
   return '';
 }
-function normTime_(v) {
-  const m = String(v || '').trim().match(/^(\d{1,2}):?(\d{2})/);
-  return m ? pad_(m[1]) + ':' + m[2] : '';
+function normTime_(v) {   // 08:00 같은 시각은 맞춰 쓰고, '아침' 같은 글자는 그대로 둬요
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{1,2}):?(\d{2})(?!\d)/);
+  if (m) return pad_(m[1]) + ':' + m[2];
+  m = s.match(/ (\d{2}):(\d{2}):\d{2} GMT/);   // 시트가 시각을 날짜로 바꿔 둔 경우
+  if (m) return m[1] + ':' + m[2];
+  return s;
 }
 function pad_(n) { return ('0' + n).slice(-2); }
 function newId_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
