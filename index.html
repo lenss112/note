@@ -201,6 +201,13 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .duo{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:6px}
 .duo .col{padding:12px 10px 8px;min-width:0}
 .duo .col+.col{border-left:1px solid var(--line)}
+/* 오늘 화면: 왼쪽 칸만 일정/살 것 2행, 할일은 오른쪽 전체 */
+.duo.home3{grid-template-areas:"ev td" "sh td";grid-template-rows:auto 1fr}
+.duo.home3 .cev{grid-area:ev} .duo.home3 .ctd{grid-area:td;border-left:1px solid var(--line)} .duo.home3 .csh{grid-area:sh;border-left:0;border-top:1px solid var(--line)}
+.duo .csh .quick{padding:2px 0 8px;border-bottom:0;gap:6px}
+.duo .csh .quick input{padding:7px 10px;font-size:13px} .duo .csh .quick button{padding:0 11px;font-size:13px}
+.duo .csh h3 .textbtn{margin-left:auto;font-family:"Gowun Dodum",sans-serif;font-size:12px;height:24px}
+.drow .xbtn{align-self:center}
 .duo h3{font-family:"Jua",sans-serif;font-size:16px;margin:0 2px 8px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
 .duo h3 small{font-family:"Gowun Dodum",sans-serif;font-size:12px;color:var(--soft);font-weight:400}
 .duo h3 .late{font-family:"Gowun Dodum",sans-serif;font-size:12px}
@@ -787,23 +794,21 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline">${d.getMonth()+1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 ${ic(d.getHours()>=6&&d.getHours()<18?"sun":"moon")}${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
-  <div class="duo">
-    <section class="col"><h3>일정 <small>${evs.length}</small></h3>
+  <div class="duo home3">
+    <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
-    <section class="col"><h3>할일 <small>${todos.filter(t=>!t.done).length}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
+    <section class="col ctd"><h3>할일 <small>${todos.filter(t=>!t.done).length}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
       ${todos.length?todos.map(duoTd).join(""):`<div class="dempty">${kit("k_sleep")}오늘 할 일 없음<br><button data-add="todo">추가</button></div>`}</section>
+    <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
+      <form class="quick" data-quick="shop"><input placeholder="우유, 토너…" aria-label="살 것 추가" autocomplete="off"><button type="submit">추가</button></form>
+      ${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
+        <div class="body"><div class="t">${esc(x.title)}</div></div>
+        <button class="xbtn" data-shopdel="${x.id}" aria-label="삭제">×</button></div>`).join("")}</section>
   </div>
   ${S.habits.length?`<h2>오늘의 루틴 <small>${S.habits.filter(x=>x.log?.[td]).length}/${S.habits.length}</small></h2>
   <div class="qh">${S.habits.map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>
   ${S.habits.every(x=>x.log?.[td])?`<div class="alldone">${kit("k_hug")}오늘 루틴 다 했어요!</div>`:""}`:""}
   ${pinned.length?`<h2>고정한 메모</h2><div class="notes">${pinned.map(noteCard).join("")}</div>`:""}
-  <h2>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear style="margin-left:auto;height:28px">산 것 지우기</button>`:""}</h2>
-  <div class="list">
-    <form class="quick" data-quick="shop"><input placeholder="우유, 프린터 토너…" aria-label="살 것 추가" autocomplete="off"><button type="submit">추가</button></form>
-    ${shop.map(x=>`<div class="row ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
-      <div class="body"><div class="t">${esc(x.title)}</div></div>
-      <button class="xbtn" data-shopdel="${x.id}" aria-label="삭제">×</button></div>`).join("")}
-  </div>
   <h2 class="monthh">이번 달</h2>
   ${calBlock("all",V.homeSel)}
   ${V.homeSel?dayBox(V.homeSel):""}
