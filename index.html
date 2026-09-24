@@ -118,13 +118,14 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .cell .lbl.tm::before{content:"";position:absolute;left:3px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--pink)}
 .cell .lbl.tm.work::before{background:var(--work)} .cell .lbl.tm.life::before{background:var(--life)} .cell .lbl.tm.play::before{background:var(--play)}
 .cell .lbl.cr,.cell .lbl.cl{max-width:none}
-.cell .dots{display:flex;gap:3px;justify-content:center;flex-wrap:wrap}
-.cell .dots i{width:6px;height:6px;border-radius:50%}
-.cell .lbl{font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 4px;border-radius:4px;display:none}
+.cell .dots{display:none}
+.cell{min-height:88px;padding:5px 2px}
+.cell .lbl{display:block;font-size:10.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:clip;padding:1px 3px;border-radius:4px;letter-spacing:-.3px}
+.cell .lbl.cr{margin-right:-2px} .cell .lbl.cl{margin-left:-2px}
 @media (min-width:640px){
-  .cell{min-height:96px}
-  .cell .dots{display:none}
-  .cell .lbl{display:block}
+  .cell{min-height:96px;padding:6px 4px}
+  .cell .lbl{font-size:11px;padding:1px 4px;text-overflow:ellipsis;letter-spacing:0}
+  .cell .lbl.cr{margin-right:-4px} .cell .lbl.cl{margin-left:-4px}
   .cell .n{align-self:flex-start}
 }
 .dots i.work,.lbl.work{background:var(--work)} .dots i.life,.lbl.life{background:var(--life)} .dots i.play,.lbl.play{background:var(--play)}
