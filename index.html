@@ -376,6 +376,8 @@ h2::before,.duo h3::before{content:"";width:16px;height:16px;background:var(--he
 .lbl.hol .ic{width:12px;height:12px;vertical-align:-2px}
 .shead h3 .ic{width:28px;height:28px;vertical-align:-6px;margin-right:4px}
 .ttl .ic{width:24px;height:24px;vertical-align:-5px;margin-left:4px}
+.ttl .home{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ttl .home:hover{opacity:.8}
 .streak .ic{width:16px;height:16px;vertical-align:-3px}
 .empty .ic{width:22px;height:22px;vertical-align:-5px;margin-right:4px}
 .stickers{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
@@ -600,7 +602,7 @@ function paintSync(){
 }
 function renderChrome(){
   document.title=SITE.title;
-  document.getElementById("ttl").innerHTML=esc(TITLES[V.tab]||SITE.title)+ic("bow");
+  document.getElementById("ttl").innerHTML=`<span class="home" data-tab="today" role="button" aria-label="홈으로">${esc(TITLES[V.tab]||SITE.title)+ic("bow")}</span>`;
   document.getElementById("brand").textContent=SITE.title;
   document.getElementById("foot").textContent=SITE.footer;
   const tb=([id,l,i])=>`<button data-tab="${id}" ${V.tab===id?'aria-current="page"':""}><span class="ico" aria-hidden="true">${ic(i)}</span>${l}</button>`;
@@ -621,7 +623,7 @@ document.getElementById("dscrim").onclick=()=>openMenu(false);
 document.getElementById("sync").onclick=()=>{if(CFG.url)loadAll({force:true});else{V.tab="settings";render()}};
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-tab]");
-  if(t){V.tab=t.dataset.tab;if(V.filter==="g")V.filter="all";openMenu(false);render();window.scrollTo(0,0)}
+  if(t){if(t.classList.contains("home"))V.homeSel=null;V.tab=t.dataset.tab;if(V.filter==="g")V.filter="all";openMenu(false);render();window.scrollTo(0,0)}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.body.classList.contains("menu")){openMenu(false);document.getElementById("burger").focus()}});
 
