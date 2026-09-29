@@ -5,6 +5,8 @@
  *  1) 스프레드시트의 일정·할일·메모·루틴·살것 탭을 사이트와 주고받기
  *  2) 구글 캘린더 일정을 읽어서 사이트 캘린더에 보여주기 (읽기 전용)
  *  3) 구글 드라이브 '허브_인박스' 폴더에 Claude가 넣은 JSON 파일을 스프레드시트로 옮기기
+ *  4) 마감일이 있는 할일을 구글 캘린더 '姫の手帳 할일'에 종일 일정으로 자동 등록
+ *     (네이버 캘린더는 이 캘린더의 iCal 비공개 주소를 '구독'해서 봐요)
  *
  * 사이트의 모든 내용(일정·할일·메모·루틴·살것·영양제·사이트 문구)은 이 스프레드시트에서 고칠 수 있어요.
  *
@@ -17,7 +19,7 @@ const TZ = 'Asia/Seoul';
 
 const SHEETS = {
   events: { name: '일정', cols: [['id','id'],['date','날짜'],['time','시간'],['title','제목'],['cat','분류'],['note','메모'],['sticker','스티커']] },
-  todos:  { name: '할일', cols: [['id','id'],['title','제목'],['cat','분류'],['due','마감일'],['important','중요'],['done','완료'],['doneAt','완료시각'],['created','생성']] },
+  todos:  { name: '할일', cols: [['id','id'],['title','제목'],['cat','분류'],['due','마감일'],['important','중요'],['done','완료'],['doneAt','완료시각'],['created','생성'],['gcalId','캘린더id']] },
   notes:  { name: '메모', cols: [['id','id'],['title','제목'],['body','내용'],['cat','분류'],['pinned','고정'],['updated','수정시각']] },
   habits: { name: '루틴', cols: [['id','id'],['name','이름'],['cat','분류'],['log','기록']] },
   shop:   { name: '살것', cols: [['id','id'],['title','품목'],['done','완료'],['created','생성']] },
@@ -39,6 +41,7 @@ const STICKER_KO = { k_heart:'키티하트', k_wink:'키티윙크', k_bear:'키�
 const STICKER_EN = Object.keys(STICKER_KO).reduce((m, k) => (m[STICKER_KO[k]] = k, m[k] = k, m), {});
 const BOOL_FIELDS = ['important', 'done', 'pinned', 'bold'];
 const TIME_FIELDS = ['doneAt', 'created', 'updated'];
+const TODO_CAL_NAME = '姫の手帳 할일';   // 할일이 들어가는 구글 캘린더 이름
 
 /* ---------------- 처음 한 번 실행 ---------------- */
 function setup() {
@@ -52,22 +55,27 @@ function setup() {
     token = Utilities.getUuid().replace(/-/g, '').slice(0, 24);
     props.setProperty('TOKEN', token);
   }
+  const cal = todoCal_();
   const guide = ss.getSheetByName('안내') || ss.insertSheet('안내', 0);
   guide.clear();
-  guide.getRange(1, 1, 6, 2).setValues([
+  guide.getRange(1, 1, 8, 2).setValues([
     ['사이트 토큰', token],
     ['인박스 폴더', folder.getUrl()],
     ['분류 값', '업무 / 개인 / 취미'],
     ['예/아니오 값', 'O 이면 예, 비우면 아니오'],
     ['날짜 형식', '2026-09-30'],
     ['루틴 기록', '체크한 날짜를 쉼표로 구분 (예: 2026-09-21, 2026-09-22)'],
+    ['할일 캘린더', TODO_CAL_NAME + ' (마감일 있는 할일이 자동으로 들어가요)'],
+    ['캘린더id', '할일 탭의 캘린더id 칸은 자동으로 채워져요 — 지우지 마세요'],
   ]);
-  guide.getRange('A1:A6').setFontWeight('bold');
+  guide.getRange('A1:A8').setFontWeight('bold');
   guide.setColumnWidth(1, 120);
   guide.setColumnWidth(2, 420);
   const s1 = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (s1 && s1.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(s1);
   Logger.log('토큰: ' + token);
+  Logger.log('할일 캘린더 id: ' + cal.getId());
+  syncAllTodos_();
 }
 
 /* ---------------- 웹 앱 입구 ---------------- */
@@ -89,14 +97,20 @@ function handle_(p) {
     try {
       if (p.action === 'load') {
         archiveIfDue_();
+        syncIfDue_();
         const imported = processInbox_();
         return json_(Object.assign({ ok: true, imported: imported }, loadFast_()));
       }
       if (p.action === 'ops') {
         (p.ops || []).forEach(o => {
           if (!SHEETS[o.key]) return;
-          if (o.op === 'upsert' && o.item && o.item.id) upsert_(o.key, o.item);
-          else if (o.op === 'delete' && o.id) delete_(o.key, o.id);
+          if (o.op === 'upsert' && o.item && o.item.id) {
+            if (o.key === 'todos') saveTodo_(o.item);
+            else upsert_(o.key, o.item);
+          } else if (o.op === 'delete' && o.id) {
+            if (o.key === 'todos') removeTodoEvent_(o.id);
+            delete_(o.key, o.id);
+          }
         });
         return json_({ ok: true });
       }
@@ -348,6 +362,7 @@ function gcal_(from, to) {
   const out = [];
   CalendarApp.getAllCalendars().forEach(cal => {
     try { if (cal.isHidden()) return; } catch (e) {}
+    if (cal.getName() === TODO_CAL_NAME) return;   // 할일 캘린더는 사이트 할일과 겹치니까 빼요
     const hol = /holiday/i.test(cal.getId());
     let evs = [];
     try { evs = cal.getEvents(start, end); } catch (e) { return; }
@@ -448,6 +463,90 @@ function addInbox_(x) {
     if (!nm) return false;
     item = { id: newId_(), name: String(nm), cat: cat, log: {} };
   }
-  upsert_(KEY, item);
+  if (KEY === 'todos') saveTodo_(item); else upsert_(KEY, item);
   return true;
+}
+
+/* ---------------- 할일 → 구글 캘린더 ---------------- */
+// 마감일 있는 할일 = '姫の手帳 할일' 캘린더의 종일 일정 하나.
+// 완료하면 제목 앞에 ✓, 마감일을 지우거나 할일을 지우면 일정도 지워요.
+function todoCal_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('TODO_CAL_ID');
+  if (id) { const c = CalendarApp.getCalendarById(id); if (c) return c; }
+  const found = CalendarApp.getCalendarsByName(TODO_CAL_NAME);
+  const cal = found.length ? found[0] : CalendarApp.createCalendar(TODO_CAL_NAME, { color: CalendarApp.Color.PINK, timeZone: TZ });
+  props.setProperty('TODO_CAL_ID', cal.getId());
+  return cal;
+}
+
+// 사이트는 캘린더id를 모르니까, 시트에 있던 값을 이어받은 뒤 캘린더를 맞추고 저장해요
+function saveTodo_(item) {
+  const s = sheet_('todos');
+  const row = findRow_(s, item.id);
+  if (!item.gcalId && row) item.gcalId = String(s.getRange(row, SHEETS.todos.cols.length).getDisplayValue() || '');
+  try { syncTodoEvent_(item); } catch (e) { Logger.log('캘린더 연동 실패: ' + e); }
+  upsert_('todos', item);
+}
+
+function syncTodoEvent_(item) {
+  const cal = todoCal_();
+  let ev = null;
+  if (item.gcalId) { try { ev = cal.getEventById(item.gcalId); } catch (e) {} }
+  const due = normDate_(item.due);
+  if (!due) {                                  // 마감일 없음 → 일정 없음
+    if (ev) ev.deleteEvent();
+    item.gcalId = '';
+    return;
+  }
+  const title = (item.done ? '✓ ' : '') + (item.important ? '★ ' : '') + item.title;
+  const day = new Date(due + 'T00:00:00+09:00');
+  const desc = '姫の手帳 할일 · ' + (CAT_KO[item.cat] || '개인');
+  if (!ev) {
+    ev = cal.createAllDayEvent(title, day, { description: desc });
+    item.gcalId = ev.getId();
+    return;
+  }
+  if (ev.getTitle() !== title) ev.setTitle(title);
+  if (ev.getDescription() !== desc) ev.setDescription(desc);
+  const cur = Utilities.formatDate(ev.getAllDayStartDate(), TZ, 'yyyy-MM-dd');
+  if (cur !== due) ev.setAllDayDate(day);
+}
+
+function removeTodoEvent_(id) {
+  const s = sheet_('todos');
+  const row = findRow_(s, id);
+  if (!row) return;
+  const gid = String(s.getRange(row, SHEETS.todos.cols.length).getDisplayValue() || '');
+  if (!gid) return;
+  try { const ev = todoCal_().getEventById(gid); if (ev) ev.deleteEvent(); } catch (e) {}
+}
+
+// 시트에서 직접 고친 할일도 맞추기 — 사이트를 열 때 하루 한 번, 또는 편집기에서 syncTodosNow 실행
+function syncIfDue_() {
+  const props = PropertiesService.getScriptProperties();
+  const today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  if (props.getProperty('SYNCED_ON') === today) return;
+  props.setProperty('SYNCED_ON', today);
+  try { syncAllTodos_(); } catch (e) { Logger.log('할일 동기화 실패: ' + e); }
+}
+function syncTodosNow() {
+  Logger.log('캘린더에 맞춘 할일: ' + syncAllTodos_() + '개');
+}
+function syncAllTodos_() {
+  const def = SHEETS.todos, s = sheet_('todos');
+  const n = s.getLastRow();
+  if (n < 2) return 0;
+  const vals = s.getRange(2, 1, n - 1, def.cols.length).getDisplayValues();
+  let cnt = 0;
+  vals.forEach((r, i) => {
+    if (r.every(v => String(v).trim() === '')) return;
+    const it = fromRow_('todos', r);
+    if (!it.id) return;
+    const before = it.gcalId;
+    try { syncTodoEvent_(it); } catch (e) { return; }
+    if (it.gcalId !== before) s.getRange(i + 2, def.cols.length).setNumberFormat('@').setValue(it.gcalId);
+    if (it.gcalId) cnt++;
+  });
+  return cnt;
 }
