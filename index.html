@@ -220,6 +220,9 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .drow .dt{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
 .drow .dt.late{color:var(--warn)}
 .drow.done .t{text-decoration:line-through;color:var(--soft)}
+.donefold{display:flex;align-items:center;gap:6px;width:100%;margin:6px 0 0;padding:8px 12px;border:1px dashed var(--line,#f0d6de);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.donefold b{font-weight:600}.donefold .tg{margin-left:auto;font-size:12px}
+.donefold:hover{background:rgba(0,0,0,.03)}
 .drow .check{width:20px;height:20px}
 .dempty{font-size:13px;color:var(--soft);padding:6px 2px 8px}
 .dempty button{background:none;border:0;padding:0;color:var(--rose);font-weight:600;font-size:13px}
@@ -782,6 +785,10 @@ function todoRow(t){
     <div class="sub"><span class="tag ${t.cat}">${CATS[t.cat]||"개인"}</span>${due}</div></div></div>`;
 }
 const list=(rows,emptyMsg,addType)=>`<div class="list">${rows.length?rows.join(""):`<div class="empty">${kit("k_sleep")}${emptyMsg} ${addType?`<button data-add="${addType}">추가하기</button>`:""}</div>`}</div>`;
+function doneFold(arr,rowFn){ // 완료된 할일은 접고 개수만
+  if(!arr.length)return"";
+  return `<button class="donefold" data-showdone aria-expanded="${V.showDone}">✓ 완료 <b>${arr.length}개</b><span class="tg">${V.showDone?"접기 ▲":"펼치기 ▼"}</span></button>${V.showDone?arr.map(rowFn).join(""):""}`;
+}
 const fresh=t=>!t.done||(t.doneAt&&Date.now()-t.doneAt<86400000); // 완료 후 24시간은 목록에 남김
 function sortTodos(a){
   return a.slice().sort((x,y)=>{
@@ -868,7 +875,7 @@ function vToday(){
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
     <section class="col ctd"><h3>할일 <small>${todos.filter(t=>!t.done).length}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
-      ${todos.length?todos.map(duoTd).join(""):`<div class="dempty">${kit("k_sleep")}오늘 할 일 없음<br><button data-add="todo">추가</button></div>`}</section>
+      ${todos.some(t=>!t.done)?todos.filter(t=>!t.done).map(duoTd).join(""):`<div class="dempty">${kit(todos.length?"k_hug":"k_sleep")}${todos.length?"오늘 할 일 끝!":"오늘 할 일 없음"}<br><button data-add="todo">추가</button></div>`}${doneFold(todos.filter(t=>t.done),duoTd)}</section>
     <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
       ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
         <div class="body"><div class="t">${esc(x.title)}</div></div></div>`).join("")}</section>
@@ -883,7 +890,8 @@ function vToday(){
   <h2>언젠가 할 일 <small>${someday.filter(t=>!t.done).length}개</small></h2>
   <div class="list">
     <form class="quick" data-quick="someday"><input placeholder="언젠가 해보고 싶은 일" aria-label="언젠가 할 일 추가" autocomplete="off"><button type="submit">추가</button></form>
-    ${someday.map(todoRow).join("")}
+    ${someday.filter(t=>!t.done).map(todoRow).join("")}
+    ${doneFold(someday.filter(t=>t.done),todoRow)}
   </div>`;
 }
 
@@ -893,21 +901,20 @@ function vCal(){
   const selTd=f==="g"?[]:sortTodos(S.todos.filter(t=>t.due===V.sel&&(f==="all"||t.cat===f)));
   return `${banner()}${chips(true)}${calBlock(f)}
   <h2>${fmtDate(V.sel)} <small>일정 ${selEv.length} · 할일 ${selTd.length}</small></h2>
-  ${list([...selEv.map(e=>evRow(e)),...selTd.map(todoRow)],"이 날은 비어 있어요.","event")}`;
+  ${list([...selEv.map(e=>evRow(e)),...selTd.filter(t=>!t.done).map(todoRow)],"이 날은 비어 있어요.","event")}${doneFold(selTd.filter(t=>t.done),todoRow)}`;
 }
 
 function vTodo(){
   const pF=x=>V.filter==="all"||x.cat===V.filter;
   const all=S.todos.filter(pF);
-  const open=sortTodos(all.filter(fresh));
-  const done=all.filter(t=>t.done&&!fresh(t)).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
+  const open=sortTodos(all.filter(t=>!t.done));
+  const done=all.filter(t=>t.done).sort((a,b)=>(b.doneAt||0)-(a.doneAt||0));
   const td=today();
-  const late=open.filter(t=>!t.done&&t.due&&t.due<td),now=open.filter(t=>t.due===td||(t.done&&t.due&&t.due<td)),later=open.filter(t=>t.due&&t.due>td),nodue=open.filter(t=>!t.due);
+  const late=open.filter(t=>!t.done&&t.due&&t.due<td),now=open.filter(t=>t.due===td),later=open.filter(t=>t.due&&t.due>td),nodue=open.filter(t=>!t.due);
   const sec=(title,a)=>a.length?`<h2>${title} <small>${a.filter(t=>!t.done).length}</small></h2>${list(a.map(todoRow),"")}`:"";
   return `${banner()}${chips()}
   ${open.length?sec("밀린 일",late)+sec("오늘",now)+sec("예정",later)+sec("언젠가",nodue):list([],"남은 할일이 없어요.","todo")}
-  ${done.length?`<h2>완료 <small>${done.length}</small> <button class="textbtn" data-showdone style="margin-left:auto;height:28px">${V.showDone?"접기":"보기"}</button></h2>
-  ${V.showDone?list(done.slice(0,50).map(todoRow),""):""}`:""}`;
+  ${done.length?`<div class="list">${doneFold(done.slice(0,100),todoRow)}</div>`:""}`;
 }
 
 function noteCard(n){
