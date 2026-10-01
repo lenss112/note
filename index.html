@@ -5,7 +5,7 @@
 <script>/* 페이지를 다 읽기 전에 시트·캘린더 요청부터 먼저 보내요 */
 (function(){try{
   var g=function(k){var v=localStorage.getItem("hub:"+k);return v?JSON.parse(v):null};
-  var u=g("api"),t=g("token"),q=g("queue");
+  var u=g("api")||"https://script.google.com/macros/s/AKfycbxtTdawaxliNGjGsWff5wkrBUe06PKgvc0pWE6Lb0xp0AICYhVxYF-3UCMPXN7Dy-l42w/exec",t=g("token")||"bd60aa459eae43969a372cdc",q=g("queue");/* 누구나 접속하면 바로 연결돼요 */
   if(!u||!t||/[#&]t=/.test(location.hash))return;
   var get=function(p){var U=new URL(u);for(var k in p)U.searchParams.set(k,p[k]);U.searchParams.set("token",t);return fetch(U.toString(),{redirect:"follow"})};
   if(!(q&&q.length))window.__EARLY_LOAD=get({action:"load"});
@@ -522,7 +522,8 @@ function lsGet(k){try{const v=localStorage.getItem("hub:"+k);return v?JSON.parse
 function lsSet(k,v){try{localStorage.setItem("hub:"+k,JSON.stringify(v))}catch(e){}}
 KEYS.forEach(k=>{const v=lsGet(k);if(Array.isArray(v))S[k]=v});
 const DEFAULT_API="https://script.google.com/macros/s/AKfycbxtTdawaxliNGjGsWff5wkrBUe06PKgvc0pWE6Lb0xp0AICYhVxYF-3UCMPXN7Dy-l42w/exec";
-const CFG={url:lsGet("api")||"",token:lsGet("token")||""};
+const DEFAULT_TOKEN="bd60aa459eae43969a372cdc"; // 공개 토큰: 어느 기기에서 열어도 자동 연결
+const CFG={url:lsGet("api")||DEFAULT_API,token:lsGet("token")||DEFAULT_TOKEN};
 let FIRST_CONNECT=false;
 (()=>{ // 주소 끝에 #t=토큰 을 붙여 열면 이 기기에 자동 연결
   const m=location.hash.match(/[#&]t=([^&]+)/);
