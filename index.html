@@ -450,6 +450,11 @@ h2::before,.duo h3::before{content:"";width:16px;height:16px;background:var(--he
 @media (max-width:480px){.wxtip{font-size:11px}.wxtip span{padding:2px 6px}.dateline .kd{width:36px;height:36px}.dateline .wx{font-size:15px;gap:3px}.dateline .wx small{font-size:11px}.dateline .wx .ic{width:18px;height:18px}.dateline{gap:4px}}
 @media (max-width:360px){.dateline .wx small{display:none}}
 .dateline .wx small{font-family:"Gowun Dodum",sans-serif;font-size:13px;color:var(--soft);font-weight:400}
+/* 날씨 제안: 모바일에서도 잘리지 않게 다음 줄에 전부 */
+.dateline{flex-wrap:wrap;white-space:normal}
+.dateline .kd{order:2}
+.wxtip{order:3;flex-basis:100%;flex-wrap:wrap;overflow:visible;gap:5px;margin-top:2px}
+.wxtip span{white-space:normal;overflow:visible;text-overflow:clip;flex-shrink:0;max-width:100%;padding:3px 9px;line-height:1.4}
 .dempty .kit{width:44px;height:44px;display:block;margin:0 0 4px}
 .empty .kit{width:40px;height:40px;vertical-align:middle;margin-right:6px}
 .scard{position:relative}
@@ -1165,6 +1170,11 @@ document.addEventListener("visibilitychange",()=>{
 window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
 if(CFG.url)loadAll({first:FIRST_CONNECT});
+/* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
+const APP_VER="2026-10-02a";
+async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
+setTimeout(checkUpdate,3000);
 if("serviceWorker" in navigator&&location.protocol==="https:"){
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
