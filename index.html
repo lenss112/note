@@ -223,6 +223,17 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .donefold{display:flex;align-items:center;gap:6px;width:100%;margin:6px 0 0;padding:8px 12px;border:1px dashed var(--line,#f0d6de);border-radius:12px;background:transparent;color:var(--soft);font:inherit;font-size:13px;cursor:pointer;text-align:left}
 .donefold b{font-weight:600}.donefold .tg{margin-left:auto;font-size:12px}
 .donefold:hover{background:rgba(0,0,0,.03)}
+/* 오늘의 추천 */
+.rec{margin:10px 0 4px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.rec h3{margin:0 0 4px;font-family:"Jua",sans-serif;font-size:17px;display:flex;align-items:center;gap:8px}
+.rec h3 .textbtn{margin-left:auto;height:30px}
+.rec .sub{margin:0 0 8px;font-size:12px;color:var(--soft)}
+.recrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--line)}
+.recrow .body{flex:1;min-width:0}.recrow .t{font-size:14px;overflow-wrap:anywhere}
+.recrow .why{font-size:11px;color:var(--soft)}
+.recrow button{height:30px;padding:0 10px;border-radius:9px;font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
+.recrow button.ok{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+
 .drow .check{width:20px;height:20px}
 .dempty{font-size:13px;color:var(--soft);padding:6px 2px 8px}
 .dempty button{background:none;border:0;padding:0;color:var(--rose);font-weight:600;font-size:13px}
@@ -607,7 +618,7 @@ async function loadAll(opts={}){
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
-    NET.done++;render();          // 시트 내용은 받자마자 먼저 보여줘요
+    NET.done++;render();migrate();          // 시트 내용은 받자마자 먼저 보여줘요
     await calP;
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
@@ -860,6 +871,45 @@ function dayBox(ds){
       ${tds.length?tds.map(duoTd).join(""):`<div class="dempty">할일 없음<br><button data-add="todo">추가</button></div>`}</section>
   </div>`;
 }
+
+/* ---------- 오늘의 추천: 언젠가 할 일에서 오늘 할 일 골라주기 ---------- */
+const tCreated=t=>typeof t.created==="number"?t.created:(Date.parse(String(t.created||"").replace(" ","T"))||0);
+function recPick(){
+  const td=today(),skip=lsGet("recskip:"+td)||[],wd=new Date().getDay(),weekend=wd===0||wd===6;
+  const pool=S.todos.filter(t=>!t.done&&!t.due&&!skip.includes(t.id));
+  const scored=pool.map(t=>{
+    const age=Math.max(0,Math.floor((Date.now()-tCreated(t))/86400000));
+    let sc=Math.min(age,30),why=[];
+    if(t.important){sc+=50;why.push("중요")}
+    if(/빠른|급|asap|얼른|빨리/i.test(t.title)){sc+=25;why.push("빨리 하기로 함")}
+    if(t.cat==="work"&&!weekend){sc+=10;why.push("평일 업무")}
+    if(t.cat==="play"&&weekend){sc+=10;why.push("주말 취미")}
+    if(age>=7)why.push(age+"일째 대기");
+    sc+=((t.id.charCodeAt(t.id.length-1)+wd)%7)/10; // 동점일 때 날마다 조금씩 바뀌게
+    return{t,sc,why}}).sort((a,b)=>b.sc-a.sc);
+  const out=[],cnt={};
+  for(const x of scored){if(out.length>=3)break;if((cnt[x.t.cat]||0)>=2)continue;cnt[x.t.cat]=(cnt[x.t.cat]||0)+1;out.push(x)}
+  return out;
+}
+function recBox(){
+  const r=recPick();if(!r.length)return"";
+  return `<section class="rec"><h3>✨ 오늘의 추천 <button class="textbtn" data-recall>전부 오케이</button></h3>
+  <p class="sub">언젠가 할 일 중에서 골랐어요. 오케이하면 오늘 할 일로 들어가요.</p>
+  ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${esc(t.title)}</div><div class="why">${CATS[t.cat]||""}${why.length?" · "+why.join(" · "):""}</div></div>
+  <button class="ok" data-recok="${t.id}">오케이</button><button data-recskip="${t.id}">패스</button></div>`).join("")}</section>`;
+}
+function recAccept(ids){const td=today();ids.forEach(id=>{const t=S.todos.find(x=>x.id===id);if(t)t.due=td});save("todos");render()}
+
+/* ---------- 한 번만 하는 정리 (2026-10-02) ---------- */
+const MIG_AT=1790867578950;
+function migrate(){
+  if(Date.now()-MIG_AT>3*86400000)return;
+  let ch=false;
+  if(!lsGet("mig:someday1")){S.todos.forEach(t=>{if(!t.done&&t.due&&tCreated(t)<MIG_AT){t.due="";ch=true}});lsSet("mig:someday1",1)}
+  if(!lsGet("mig:add1")){[["mig1toilet","화장실 하수구 냄새 탈취제 사거나 해결하기",false],["mig1washer","세탁기 고치기 (빠른 시일 내)",true]].forEach(([id,title,imp])=>{
+    if(!S.todos.some(t=>t.id===id)){S.todos.push({id,title,cat:"life",due:"",important:imp,done:false,doneAt:null,created:Date.now()});ch=true}});lsSet("mig:add1",1)}
+  if(ch){save("todos");render()}
+}
 function vToday(){
   const td=today(),d=new Date();
   const evs=allEvents().filter(e=>e.date===td).sort(byTime);
@@ -871,6 +921,7 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline"><span class="dday">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})</span><span class="wx" id="wx">${wxHtml()}</span><span class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
+  ${recBox()}
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
@@ -1001,6 +1052,9 @@ document.getElementById("main").addEventListener("click",async e=>{
   if(el=g("[data-add]")){const inDay=el.closest("#daybox");openSheet(el.dataset.add,null,V.tab==="cal"?{date:V.sel}:inDay?{date:V.homeSel}:{});return}
   if(g("[data-dayclose]")){V.homeSel=null;render();return}
   if(g("[data-showdone]")){V.showDone=!V.showDone;render();return}
+  if(el=g("[data-recok]")){recAccept([el.dataset.recok]);return}
+  if(g("[data-recall]")){recAccept(recPick().map(x=>x.t.id));return}
+  if(el=g("[data-recskip]")){const k="recskip:"+today(),a=lsGet(k)||[];a.push(el.dataset.recskip);lsSet(k,a);render();return}
   if(g("[data-reload]")){loadAll({force:true});return}
   if(g("[data-connect]")){
     const url=document.getElementById("s_url").value.trim(),tok=document.getElementById("s_tok").value.trim();
