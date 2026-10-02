@@ -231,6 +231,9 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .recrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--line)}
 .recrow .body{flex:1;min-width:0}.recrow .t{font-size:14px;overflow-wrap:anywhere}
 .recrow .why{font-size:11px;color:var(--soft)}
+.t .par{display:block;font-size:11px;line-height:1.3;color:var(--soft);font-weight:400}
+.grph{padding:10px 2px 2px;font-size:13px;font-weight:600}.grph small{font-weight:400;color:var(--soft);margin-left:4px}
+.row.step{padding-left:14px}
 .recrow button{height:30px;padding:0 10px;border-radius:9px;font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink)}
 .recrow button.ok{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 
@@ -490,6 +493,18 @@ h2 .ic.hic{width:22px;height:22px;vertical-align:-4px}
 <script>
 (function(){
 const CATS={work:"업무",life:"개인",play:"취미"};
+/* ---------- 단계로 쪼갠 할일: 제목이 "큰 일 › 작은 단계" ---------- */
+const SEP=" › ";
+function stepOf(t){const ti=String(t&&t.title||""),i=ti.indexOf(SEP);return i<0?null:{par:ti.slice(0,i),step:ti.slice(i+SEP.length)}}
+const tcOf=t=>typeof t.created==="number"?t.created:(Date.parse(String(t.created||"").replace(" ","T"))||0);
+function stepInfo(t){const s=stepOf(t);if(!s)return null;
+  const g=S.todos.filter(x=>{const y=stepOf(x);return y&&y.par===s.par}).sort((a,b)=>tcOf(a)-tcOf(b)||(a.id<b.id?-1:1));
+  return{...s,n:g.indexOf(t)+1,total:g.length,group:g}}
+const isNextStep=t=>{const s=stepInfo(t);return !s||s.group.slice(0,s.n-1).every(x=>x.done)};
+const tText=(t,noPar)=>{const s=stepOf(t);return s?`${noPar===true?"":`<span class="par">${esc(s.par)}</span>`}${esc(s.step)}`:esc(t.title)};
+function somedayRows(a){let prev=null;return a.map(t=>{const s=stepOf(t),p=s?s.par:null;let h="";
+  if(p&&p!==prev){const g=stepInfo(t).group;h=`<div class="grph">${esc(p)} <small>${g.filter(x=>x.done).length}/${g.length}단계</small></div>`}
+  prev=p;return h+todoRow(t,!!p)}).join("")}
 const TABS=[["today","홈","k_bear"],["cal","캘린더","calendar"],["todo","할일","clipboard"],["note","메모","openbook"],["habit","루틴","alarm"]];
 const TITLES={today:"",cal:"캘린더",todo:"할일",note:"메모",habit:"루틴",settings:"설정"};
 const KEYS=["events","todos","notes","habits","shop"];
@@ -623,7 +638,7 @@ async function loadAll(opts={}){
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
-    NET.done++;render();migrate();          // 시트 내용은 받자마자 먼저 보여줘요
+    NET.done++;render();migrate();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
     await calP;
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
@@ -790,14 +805,14 @@ function evRow(e,showDate){
   return `<div class="row"><span class="bar ${e.cat}"></span><span class="time">${e.time?esc(e.time):"종일"}</span>
     <div class="body" data-edit="event" data-id="${e.id}"><div class="t">${ic(stickerOf(e),"stk")}${esc(e.title)}</div><div class="sub">${sub}</div></div></div>`;
 }
-function todoRow(t){
+function todoRow(t,inGroup){
   const td=today();let due="";
   if(t.due){const dd=diffDays(td,t.due);
     if(!t.done&&dd>0)due=`<span class="late">${ic("bang")}${dd}일 지남</span>`;
     else if(t.due===td)due=`<span>오늘까지</span>`;
     else due=`<span>${fmtDate(t.due)}까지</span>`;}
-  return `<div class="row ${t.done?"done":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
-    <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${esc(t.title)}</div>
+  return `<div class="row ${t.done?"done":""}${inGroup===true?" step":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
+    <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t,inGroup===true)}</div>
     <div class="sub"><span class="tag ${t.cat}">${CATS[t.cat]||"개인"}</span>${due}</div></div></div>`;
 }
 const list=(rows,emptyMsg,addType)=>`<div class="list">${rows.length?rows.join(""):`<div class="empty">${kit("k_sleep")}${emptyMsg} ${addType?`<button data-add="${addType}">추가하기</button>`:""}</div>`}</div>`;
@@ -822,7 +837,7 @@ function duoEv(e){
 function duoTd(t){
   const dd=t.due?diffDays(today(),t.due):0;
   return `<div class="drow ${t.done?"done":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
-    <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${esc(t.title)}</div>
+    <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t)}</div>
     ${dd>0?`<div class="dt late">${ic("bang")}${dd}일 지남</div>`:""}</div></div>`;
 }
 function banner(){
@@ -881,10 +896,11 @@ function dayBox(ds){
 const tCreated=t=>typeof t.created==="number"?t.created:(Date.parse(String(t.created||"").replace(" ","T"))||0);
 function recPick(){
   const td=today(),skip=lsGet("recskip:"+td)||[],wd=new Date().getDay(),weekend=wd===0||wd===6;
-  const pool=S.todos.filter(t=>!t.done&&!t.due&&!skip.includes(t.id));
+  const pool=S.todos.filter(t=>!t.done&&!t.due&&!skip.includes(t.id)&&isNextStep(t));
   const scored=pool.map(t=>{
     const age=Math.max(0,Math.floor((Date.now()-tCreated(t))/86400000));
-    let sc=Math.min(age,30),why=[];
+    let sc=Math.min(age,30),why=[];const si=stepInfo(t);
+    if(si)why.push(si.n+"/"+si.total+"단계");
     if(t.important){sc+=50;why.push("중요")}
     if(/빠른|급|asap|얼른|빨리/i.test(t.title)){sc+=25;why.push("빨리 하기로 함")}
     if(t.cat==="work"&&!weekend){sc+=10;why.push("평일 업무")}
@@ -899,8 +915,8 @@ function recPick(){
 function recBox(){
   const r=recPick();if(!r.length)return"";
   return `<section class="rec"><h3>✨ 오늘의 추천 <button class="textbtn" data-recall>전부 오케이</button></h3>
-  <p class="sub">언젠가 할 일 중에서 골랐어요. 오케이하면 오늘 할 일로 들어가요.</p>
-  ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${esc(t.title)}</div><div class="why">${CATS[t.cat]||""}${why.length?" · "+why.join(" · "):""}</div></div>
+  <p class="sub">언젠가 할 일 중에서 골랐어요. 큰 일은 지금 할 단계 하나만 보여줘요.</p>
+  ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${tText(t)}</div><div class="why">${CATS[t.cat]||""}${why.length?" · "+why.join(" · "):""}</div></div>
   <button class="ok" data-recok="${t.id}">오케이</button><button data-recskip="${t.id}">패스</button></div>`).join("")}</section>`;
 }
 function recAccept(ids){const td=today();ids.forEach(id=>{const t=S.todos.find(x=>x.id===id);if(t)t.due=td});save("todos");render()}
@@ -913,6 +929,20 @@ function migrate(){
   if(!lsGet("mig:someday1")){S.todos.forEach(t=>{if(!t.done&&t.due&&tCreated(t)<MIG_AT){t.due="";ch=true}});lsSet("mig:someday1",1)}
   if(!lsGet("mig:add1")){[["mig1toilet","화장실 하수구 냄새 탈취제 사거나 해결하기",false],["mig1washer","세탁기 고치기 (빠른 시일 내)",true]].forEach(([id,title,imp])=>{
     if(!S.todos.some(t=>t.id===id)){S.todos.push({id,title,cat:"life",due:"",important:imp,done:false,doneAt:null,created:Date.now()});ch=true}});lsSet("mig:add1",1)}
+  if(ch){save("todos");render()}
+}
+/* ---------- 한 번만: 언젠가 할 일을 작은 단계로 쪼개기 (2026-10-02) ---------- */
+const MIG2_AT=1790900000000,MIG2={"mig1washer": ["세탁기 고치기", ["서비스센터에 연락해서 수리 접수하기 (모델명 스티커 사진 먼저 찍기)", "기사님 방문 날짜 잡고 캘린더에 넣기", "방문 전에 세탁기 주변 비워두기", "수리 받고 한 번 돌려서 확인하기"]], "mig1toilet": ["화장실 하수구 냄새 해결하기", ["냄새가 어느 배수구에서 나는지 확인하기", "배수구 덮개 열고 머리카락·찌꺼기 청소하기", "냄새 차단 트랩이나 탈취제 주문하기", "설치하고 다음 날 냄새 다시 확인하기"]], "mupo84mw31e2g": ["", ["지금 요금제랑 한 달 데이터 사용량 확인하기", "요금제 2~3개 골라 가격 비교하기", "약정·위약금 확인하고 요금제 변경 신청하기"]], "mumjb5em8mqm2": ["K-패스 모바일티머니 등록", ["Apple Pay에서 모바일 티머니 발급하기", "K-패스 누리집에 모바일 티머니 카드번호 등록하기", "기존 K-패스 카드 해제하기"]], "muex0f838ilv2": ["토스 자동이체 등록", ["자동이체 걸 항목·금액·날짜 정하기", "토스 앱에서 자동이체 등록하기", "첫 이체일에 잘 빠졌는지 확인하기"]], "muex0efx4i62n": ["텀블러 꽂이 사기", ["텀블러 꽂이 둘 자리 크기 재기", "마음에 드는 거 2~3개 골라 비교하기", "주문하기"]], "muewxs7gas1uh": ["", ["바탕화면 파일을 폴더로 모으기", "다운로드 폴더 비우기", "안 쓰는 프로그램 지우기", "중요한 파일 클라우드에 백업하기"]], "muewxsnhjya43": ["", ["배경으로 쓸 이미지 고르기", "화면 크기에 맞게 자르기", "배경화면으로 설정하기"]], "muewxr0l868hr": ["", ["올릴 영상이랑 썸네일 준비하기", "제목·소개·태그 쓰기", "빌리빌리에 업로드하기"]], "muewxrrm44ss8": ["", ["올릴 영상이랑 썸네일 준비하기", "제목·소개·태그 쓰기", "니코동에 업로드하기"]], "muf69e8ll15po": ["", ["고칠 부분 메모하기", "영상이나 설명 수정하기", "다시 올리고 잘 반영됐는지 확인하기"]], "mupab9wsiq2z5": ["", ["입고 싶은 의상 참고 사진 모으기", "갖고 있는 옷·소품이랑 맞춰보기", "새로 살 것 정리해서 살 것 목록에 넣기"]], "mupabauxi3wuh": ["", ["보정할 포카 사진 고르기", "밝기·색감 보정하기", "완성본 저장하기"]]};
+function migrateSteps(){
+  if(Date.now()-MIG2_AT>14*86400000)return;
+  let ch=false;
+  Object.entries(MIG2).forEach(([id,[par,steps]])=>{
+    const o=S.todos.find(t=>t.id===id);
+    if(!o||o.done||o.due||stepOf(o))return;                // 이미 쪼갰거나 끝났거나 오늘로 잡은 건 그대로
+    const p=par||String(o.title).replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u,""),base=tcOf(o)||Date.now();
+    steps.forEach((st,i)=>{const nid="st_"+id+"_"+(i+1);
+      if(!S.todos.some(t=>t.id===nid))S.todos.push({id:nid,title:p+SEP+st,cat:o.cat,due:"",important:!!o.important,done:false,doneAt:null,created:base+i})});
+    S.todos=S.todos.filter(t=>t!==o);ch=true});
   if(ch){save("todos");render()}
 }
 function vToday(){
@@ -946,7 +976,7 @@ function vToday(){
   <h2>언젠가 할 일 <small>${someday.filter(t=>!t.done).length}개</small></h2>
   <div class="list">
     <form class="quick" data-quick="someday"><input placeholder="언젠가 해보고 싶은 일" aria-label="언젠가 할 일 추가" autocomplete="off"><button type="submit">추가</button></form>
-    ${someday.filter(t=>!t.done).map(todoRow).join("")}
+    ${somedayRows(someday.filter(t=>!t.done))}
     ${doneFold(someday.filter(t=>t.done),todoRow)}
   </div>`;
 }
