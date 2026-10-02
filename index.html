@@ -78,6 +78,9 @@ h1.page{font-family:"Jua",sans-serif;font-size:30px;margin:4px 0 16px}
 .row:first-child{border-top:0}
 .row .body{flex:1;min-width:0;cursor:pointer}
 .row .t{word-break:break-word}
+.tnote{display:block;font-size:12px;color:var(--soft);margin-top:2px;line-height:1.45;white-space:pre-wrap}
+[data-tid][draggable=true]{cursor:grab}[data-tid].dragging{opacity:.4}
+[data-tid].drop-above{box-shadow:inset 0 2px 0 var(--ink)}[data-tid].drop-below{box-shadow:inset 0 -2px 0 var(--ink)}
 .row .sub{font-size:12.5px;color:var(--soft);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap}
 .row.done .t{text-decoration:line-through;color:var(--soft)}
 .bar{width:4px;align-self:stretch;border-radius:4px;flex-shrink:0}
@@ -501,7 +504,11 @@ function stepInfo(t){const s=stepOf(t);if(!s)return null;
   const g=S.todos.filter(x=>{const y=stepOf(x);return y&&y.par===s.par}).sort((a,b)=>tcOf(a)-tcOf(b)||(a.id<b.id?-1:1));
   return{...s,n:g.indexOf(t)+1,total:g.length,group:g}}
 const isNextStep=t=>{const s=stepInfo(t);return !s||s.group.slice(0,s.n-1).every(x=>x.done)};
-const tText=(t,noPar)=>{const s=stepOf(t);return s?`${noPar===true?"":`<span class="par">${esc(s.par)}</span>`}${esc(s.step)}`:esc(t.title)};
+const NSEP=" ¶ ";
+const tSplit=t=>{const ti=String(t&&t.title||""),i=ti.indexOf(NSEP);return i<0?[ti,""]:[ti.slice(0,i),ti.slice(i+NSEP.length)]};
+const tText=(t,noPar)=>{const [main,note]=tSplit(t),s=stepOf({title:main});
+  const head=s?`${noPar===true?"":`<span class="par">${esc(s.par)}</span>`}${esc(s.step)}`:esc(main);
+  return head+(note?`<span class="tnote">${esc(note)}</span>`:"")};
 function somedayRows(a){let prev=null;return a.map(t=>{const s=stepOf(t),p=s?s.par:null;let h="";
   if(p&&p!==prev){const g=stepInfo(t).group;h=`<div class="grph">${esc(p)} <small>${g.filter(x=>x.done).length}/${g.length}단계</small></div>`}
   prev=p;return h+todoRow(t,!!p)}).join("")}
@@ -814,7 +821,7 @@ function todoRow(t,inGroup){
     if(!t.done&&dd>0)due=`<span class="late">${ic("bang")}${dd}일 지남</span>`;
     else if(t.due===td)due=`<span>오늘까지</span>`;
     else due=`<span>${fmtDate(t.due)}까지</span>`;}
-  return `<div class="row ${t.done?"done":""}${inGroup===true?" step":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
+  return `<div class="row ${t.done?"done":""}${inGroup===true?" step":""}" data-tid="${t.id}" ${t.done?"":'draggable="true"'}><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
     <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t,inGroup===true)}</div>
     <div class="sub">${due}</div></div></div>`;
 }
@@ -827,9 +834,8 @@ const fresh=t=>!t.done||(t.doneAt&&Date.now()-t.doneAt<86400000); // 완료 후 
 function sortTodos(a){
   return a.slice().sort((x,y)=>{
     if(x.done!==y.done)return x.done?1:-1;
-    if(!!x.important!==!!y.important)return x.important?-1:1;
     const dx=x.due||"9999",dy=y.due||"9999";
-    return dx<dy?-1:dx>dy?1:(x.created||0)-(y.created||0);
+    return dx<dy?-1:dx>dy?1:(tcOf(x)-tcOf(y))||String(x.id).localeCompare(String(y.id));
   });
 }
 const byTime=(a,b)=>(a.date+(a.time||"00:00"))<(b.date+(b.time||"00:00"))?-1:1;
@@ -839,7 +845,7 @@ function duoEv(e){
 }
 function duoTd(t){
   const dd=t.due?diffDays(today(),t.due):0;
-  return `<div class="drow ${t.done?"done":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
+  return `<div class="drow ${t.done?"done":""}" data-tid="${t.id}" ${t.done?"":'draggable="true"'}><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
     <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t)}</div>
     ${dd>0?`<div class="dt late">${ic("bang")}${dd}일 지남</div>`:""}</div></div>`;
 }
@@ -958,6 +964,8 @@ async function pullInbox(){
   try{
     const r=await fetch("./inbox.json?v="+Date.now(),{cache:"no-store"});if(!r.ok)return;
     const j=await r.json(),seen=lsGet("inbox:seen")||[];let ch=false;
+    (j.remove||[]).forEach(id=>{const k="rm:"+id;if(seen.includes(k))return;seen.push(k);
+      const n=S.todos.length;S.todos=S.todos.filter(t=>t.id!==id);if(S.todos.length!==n)ch=true});
     (j.todos||[]).forEach(x=>{
       if(!x.id||seen.includes(x.id))return;seen.push(x.id);
       if(x.exp&&Date.now()>Date.parse(x.exp))return;          // 오래된 건 다른 기기에서 다시 안 생기게
@@ -1170,7 +1178,8 @@ function openSheet(type,item,preset={}){
       ${STICKERS.map(([k,l])=>`<button type="button" data-stk="${k}" aria-pressed="${item?.sticker===k}">${ic(k)}${l}</button>`).join("")}
     </div></div>`;
   if(type==="todo")f=`
-    <div class="field"><label for="f_title">할일</label><input id="f_title" value="${esc(item?.title)}" placeholder="예: 교안 제작"></div>
+    <div class="field"><label for="f_title">할일</label><input id="f_title" value="${esc(tSplit(item||{})[0])}" placeholder="예: 빨래 개기"></div>
+    <div class="field"><label for="f_tnote">부가설명</label><textarea id="f_tnote" rows="2" placeholder="곡 이름, 준비물 등">${esc(tSplit(item||{})[1])}</textarea></div>
     <div class="field"><label for="f_due">마감일 (비우면 언젠가 할 일)</label><input id="f_due" type="date" value="${item?.due||preset.date||""}"></div>
     ${catsHtml}
     <label class="toggle"><input type="checkbox" id="f_imp" ${item?.important?"checked":""}> 중요한 일로 표시</label>`;
@@ -1204,7 +1213,7 @@ function openSheet(type,item,preset={}){
     const o=item?{...item}:{id:newId(),created:Date.now()};
     o.cat=curCat;
     if(type==="event"){o.title=title;o.date=v("f_date")||today();o.time=v("f_time");o.note=v("f_note");o.sticker=curStk}
-    if(type==="todo"){o.title=title;o.due=v("f_due");o.important=document.getElementById("f_imp").checked;if(isNew){o.done=false;o.doneAt=null}}
+    if(type==="todo"){const tn=(document.getElementById("f_tnote")?.value||"").trim().replace(/¶/g,"");o.title=title+(tn?NSEP+tn:"");o.due=v("f_due");o.important=document.getElementById("f_imp").checked;if(isNew){o.done=false;o.doneAt=null}}
     if(type==="note"){o.title=title;o.body=document.getElementById("f_body").value;o.pinned=document.getElementById("f_pin").checked;o.updated=Date.now()}
     if(type==="habit"){o.name=title;o.log=o.log||{}}
     if(isNew)S[key].push(o);else S[key]=S[key].map(x=>x.id===o.id?o:x);
@@ -1223,8 +1232,28 @@ document.addEventListener("visibilitychange",()=>{
 window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
 if(CFG.url)loadAll({first:FIRST_CONNECT});
+/* ---------- 할일 드래그로 순서 바꾸기 (마우스) ---------- */
+let dragId=null;
+const clearDrop=()=>document.querySelectorAll(".drop-above,.drop-below").forEach(x=>x.classList.remove("drop-above","drop-below"));
+document.addEventListener("dragstart",e=>{const r=e.target.closest&&e.target.closest("[data-tid][draggable=true]");if(!r)return;
+  dragId=r.dataset.tid;r.classList.add("dragging");e.dataTransfer.effectAllowed="move";try{e.dataTransfer.setData("text/plain",dragId)}catch(_){}});
+document.addEventListener("dragend",e=>{document.querySelectorAll(".dragging").forEach(x=>x.classList.remove("dragging"));clearDrop();dragId=null});
+document.addEventListener("dragover",e=>{if(!dragId)return;const r=e.target.closest("[data-tid]");if(!r||r.dataset.tid===dragId)return;
+  const src=document.querySelector(`[data-tid="${dragId}"]`);if(!src||src.parentNode!==r.parentNode)return;
+  e.preventDefault();clearDrop();const b=r.getBoundingClientRect();r.classList.add(e.clientY<b.top+b.height/2?"drop-above":"drop-below")});
+document.addEventListener("drop",e=>{if(!dragId)return;const r=e.target.closest("[data-tid]");const src=document.querySelector(`[data-tid="${dragId}"]`);
+  if(!r||!src||r===src||src.parentNode!==r.parentNode){clearDrop();return}
+  e.preventDefault();const above=r.classList.contains("drop-above");clearDrop();
+  r.parentNode.insertBefore(src,above?r:r.nextSibling);
+  const ids=[...r.parentNode.querySelectorAll(":scope>[data-tid]")].map(x=>x.dataset.tid);
+  const items=ids.map(id=>S.todos.find(t=>t.id===id)).filter(Boolean);
+  const base=Math.min(...items.map(tcOf).filter(n=>n>0),Date.now());
+  const moved=S.todos.find(t=>t.id===dragId),tgt=S.todos.find(t=>t.id===r.dataset.tid);
+  if(moved&&tgt&&moved.due!==tgt.due&&!(moved.due&&tgt.due&&moved.due<today()&&tgt.due<=today()))moved.due=tgt.due; // 다른 날짜 칸으로 옮기면 그 날짜로
+  items.forEach((t,i)=>{t.created=base+i*60000});                          // 1분 간격 → 시트에 저장돼도 순서 유지
+  save("todos");render()});
 /* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
-const APP_VER="2026-10-02d";
+const APP_VER="2026-10-02e";
 async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
 setTimeout(checkUpdate,3000);
