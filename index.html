@@ -638,7 +638,7 @@ async function loadAll(opts={}){
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
-    NET.done++;render();migrate();pullInbox();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
+    NET.done++;render();migrate();migrateOneCat();pullInbox();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
     await calP;
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
@@ -794,12 +794,13 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&suppOpen)toggleSupp(false)});
 function chips(withG){
-  return `<div class="chips" role="group" aria-label="분류">${[["all","전체"],...Object.entries(CATS),...(withG&&CFG.url?[["g","구글"]]:[])].map(([k,l])=>`<button class="chip" data-f="${k}" aria-pressed="${V.filter===k}">${l}</button>`).join("")}</div>`;
+  if(!(withG&&CFG.url))return"";
+  return `<div class="chips" role="group" aria-label="보기">${[["all","전체"],["g","구글"]].map(([k,l])=>`<button class="chip" data-f="${k}" aria-pressed="${V.filter===k}">${l}</button>`).join("")}</div>`;
 }
 
 /* ---------- row builders ---------- */
 function evRow(e,showDate){
-  const sub=`${showDate?`<span>${fmtDate(e.date)}</span>`:""}<span class="tag ${e.cat}">${e.g?(e.cat==="hol"?"공휴일":"구글"):CATS[e.cat]}</span>${e.note?`<span>${esc(e.note).slice(0,40)}</span>`:""}`;
+  const sub=`${showDate?`<span>${fmtDate(e.date)}</span>`:""}${e.g?`<span class="tag ${e.cat}">${e.cat==="hol"?"공휴일":"구글"}</span>`:""}${e.note?`<span>${esc(e.note).slice(0,40)}</span>`:""}`;
   if(e.g)return `<div class="row"><span class="bar ${e.cat}"></span><span class="time">${e.time?esc(e.time):"종일"}</span>
     <div class="body" style="cursor:default"><div class="t">${ic(stickerOf(e),"stk")}${esc(e.title)}</div><div class="sub">${sub}</div></div></div>`;
   return `<div class="row"><span class="bar ${e.cat}"></span><span class="time">${e.time?esc(e.time):"종일"}</span>
@@ -813,7 +814,7 @@ function todoRow(t,inGroup){
     else due=`<span>${fmtDate(t.due)}까지</span>`;}
   return `<div class="row ${t.done?"done":""}${inGroup===true?" step":""}"><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
     <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t,inGroup===true)}</div>
-    <div class="sub"><span class="tag ${t.cat}">${CATS[t.cat]||"개인"}</span>${due}</div></div></div>`;
+    <div class="sub">${due}</div></div></div>`;
 }
 const list=(rows,emptyMsg,addType)=>`<div class="list">${rows.length?rows.join(""):`<div class="empty">${kit("k_sleep")}${emptyMsg} ${addType?`<button data-add="${addType}">추가하기</button>`:""}</div>`}</div>`;
 function doneFold(arr,rowFn){ // 완료된 할일은 접고 개수만
@@ -903,20 +904,18 @@ function recPick(){
     if(si)why.push(si.n+"/"+si.total+"단계");
     if(t.important){sc+=50;why.push("중요")}
     if(/빠른|급|asap|얼른|빨리/i.test(t.title)){sc+=25;why.push("빨리 하기로 함")}
-    if(t.cat==="work"&&!weekend){sc+=10;why.push("평일 업무")}
-    if(t.cat==="play"&&weekend){sc+=10;why.push("주말 취미")}
     if(age>=7)why.push(age+"일째 대기");
     sc+=((t.id.charCodeAt(t.id.length-1)+wd)%7)/10; // 동점일 때 날마다 조금씩 바뀌게
     return{t,sc,why}}).sort((a,b)=>b.sc-a.sc);
   const out=[],cnt={};
-  for(const x of scored){if(out.length>=3)break;if((cnt[x.t.cat]||0)>=2)continue;cnt[x.t.cat]=(cnt[x.t.cat]||0)+1;out.push(x)}
+  for(const x of scored){if(out.length>=3)break;out.push(x)}
   return out;
 }
 function recBox(){
   const r=recPick();if(!r.length)return"";
   return `<section class="rec"><h3>✨ 오늘의 추천 <button class="textbtn" data-recall>전부 오케이</button></h3>
   <p class="sub">언젠가 할 일 중에서 골랐어요. 큰 일은 지금 할 단계 하나만 보여줘요.</p>
-  ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${tText(t)}</div><div class="why">${CATS[t.cat]||""}${why.length?" · "+why.join(" · "):""}</div></div>
+  ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${tText(t)}</div><div class="why">${why.join(" · ")}</div></div>
   <button class="ok" data-recok="${t.id}">오케이</button><button data-recskip="${t.id}">패스</button></div>`).join("")}</section>`;
 }
 function recAccept(ids){const td=today();ids.forEach(id=>{const t=S.todos.find(x=>x.id===id);if(t)t.due=td});save("todos");render()}
@@ -945,6 +944,12 @@ function migrateSteps(){
     S.todos=S.todos.filter(t=>t!==o);ch=true});
   if(ch){save("todos");render()}
 }
+/* ---------- 분류 없애기: 내 항목은 전부 개인으로 (2026-10-02) ---------- */
+function migrateOneCat(){
+  if(lsGet("mig:onecat"))return;
+  ["events","todos","notes","habits"].forEach(k=>{let ch=false;(S[k]||[]).forEach(x=>{if(x.cat&&x.cat!=="life"){x.cat="life";ch=true}});if(ch)save(k)});
+  lsSet("mig:onecat",1);render();
+}
 /* ---------- 받은편지함: Claude가 inbox.json에 넣은 할일을 시트로 옮기기 ---------- */
 async function pullInbox(){
   try{
@@ -954,7 +959,7 @@ async function pullInbox(){
       if(!x.id||seen.includes(x.id))return;seen.push(x.id);
       if(x.exp&&Date.now()>Date.parse(x.exp))return;          // 오래된 건 다른 기기에서 다시 안 생기게
       if(S.todos.some(t=>t.id===x.id))return;
-      S.todos.push({id:x.id,title:x.title,cat:x.cat||"life",due:x.due||"",important:!!x.important,done:false,doneAt:null,created:Date.now()});ch=true;
+      S.todos.push({id:x.id,title:x.title,cat:x.cat||"life",due:x.due||"",important:!!x.important,done:false,doneAt:null,created:x.order?Date.now()+x.order:Date.now()});ch=true;
     });
     lsSet("inbox:seen",seen.slice(-300));
     if(ch){save("todos");render()}
@@ -1023,7 +1028,7 @@ function noteCard(n){
   return `<button class="note ${n.cat}" data-edit="note" data-id="${n.id}">
     <span class="nt">${n.pinned?"📌 ":""}${esc(n.title||"제목 없음")}</span>
     <span class="nb">${esc(n.body)}</span>
-    <span class="nd">${CATS[n.cat]||"개인"} · ${d.getMonth()+1}/${d.getDate()}</span></button>`;
+    <span class="nd">${d.getMonth()+1}/${d.getDate()}</span></button>`;
 }
 function vNote(){
   const q=V.q.trim().toLowerCase();
@@ -1145,10 +1150,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&scrim.classList.con
 function openSheet(type,item,preset={}){
   lastFocus=document.activeElement;
   const isNew=!item;
-  const cat=item?.cat||(["work","life","play"].includes(V.filter)?V.filter:"work");
+  const cat="life";
   const names={event:"일정",todo:"할일",note:"메모",habit:"루틴"};
   const seg=isNew?`<div class="seg" role="group">${Object.entries(names).map(([k,l])=>`<button type="button" data-type="${k}" aria-pressed="${k===type}">${l}</button>`).join("")}</div>`:"";
-  const catsHtml=`<div class="field"><label>분류</label><div class="cats">${Object.entries(CATS).map(([k,l])=>`<button type="button" class="${k}" data-cat="${k}" aria-pressed="${k===cat}">${l}</button>`).join("")}</div></div>`;
+  const catsHtml="";const _unusedCats=`<div class="field"><label>분류</label><div class="cats">${Object.entries(CATS).map(([k,l])=>`<button type="button" class="${k}" data-cat="${k}" aria-pressed="${k===cat}">${l}</button>`).join("")}</div></div>`;
   let f="";
   if(type==="event")f=`
     <div class="field"><label for="f_title">일정</label><input id="f_title" value="${esc(item?.title)}" placeholder="예: 위험물기능사 필기 촬영"></div>
@@ -1216,7 +1221,7 @@ window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
 if(CFG.url)loadAll({first:FIRST_CONNECT});
 /* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
-const APP_VER="2026-10-02b";
+const APP_VER="2026-10-02c";
 async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
 setTimeout(checkUpdate,3000);
