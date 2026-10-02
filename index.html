@@ -638,7 +638,7 @@ async function loadAll(opts={}){
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
-    NET.done++;render();migrate();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
+    NET.done++;render();migrate();pullInbox();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
     await calP;
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
@@ -945,6 +945,21 @@ function migrateSteps(){
     S.todos=S.todos.filter(t=>t!==o);ch=true});
   if(ch){save("todos");render()}
 }
+/* ---------- 받은편지함: Claude가 inbox.json에 넣은 할일을 시트로 옮기기 ---------- */
+async function pullInbox(){
+  try{
+    const r=await fetch("./inbox.json?v="+Date.now(),{cache:"no-store"});if(!r.ok)return;
+    const j=await r.json(),seen=lsGet("inbox:seen")||[];let ch=false;
+    (j.todos||[]).forEach(x=>{
+      if(!x.id||seen.includes(x.id))return;seen.push(x.id);
+      if(x.exp&&Date.now()>Date.parse(x.exp))return;          // 오래된 건 다른 기기에서 다시 안 생기게
+      if(S.todos.some(t=>t.id===x.id))return;
+      S.todos.push({id:x.id,title:x.title,cat:x.cat||"life",due:x.due||"",important:!!x.important,done:false,doneAt:null,created:Date.now()});ch=true;
+    });
+    lsSet("inbox:seen",seen.slice(-300));
+    if(ch){save("todos");render()}
+  }catch(e){}
+}
 function vToday(){
   const td=today(),d=new Date();
   const evs=allEvents().filter(e=>e.date===td).sort(byTime);
@@ -1201,7 +1216,7 @@ window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
 if(CFG.url)loadAll({first:FIRST_CONNECT});
 /* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
-const APP_VER="2026-10-02a";
+const APP_VER="2026-10-02b";
 async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
 setTimeout(checkUpdate,3000);
