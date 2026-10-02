@@ -251,9 +251,9 @@ h2.monthh{margin-bottom:6px}
 .lbl.g{background:var(--line);color:var(--ink)}
 .tag.g{background:var(--line);color:var(--ink)}
 .bar.hol,.dots i.hol{background:var(--rose)}
-.lbl.hol{background:none;color:var(--rose);font-weight:600;padding-left:2px}
+.lbl.hol{background:none;color:#e5484d;font-weight:600;padding-left:2px}
 .tag.hol{background:var(--rose-weak);color:var(--rose)}
-.cell.holiday .n{color:var(--rose)}
+.cell.holiday .n{color:#e5484d;font-weight:700}
 .cell.today.holiday .n{color:#fff}
 .gstat{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--soft);margin:10px 2px 0;flex-wrap:wrap}
 .gstat.warn{color:var(--warn)}
@@ -521,6 +521,8 @@ function stickerOf(e){
   for(const[re,k]of AUTO)if(re.test(t))return k;
   return"";
 }
+/* 우리나라 공휴일 (구글 공휴일이 안 와도 빨간 날로 표시) */
+const KR_HOL={"2026-01-01": "신정", "2026-02-16": "설날 연휴", "2026-02-17": "설날", "2026-02-18": "설날 연휴", "2026-03-01": "삼일절", "2026-03-02": "대체공휴일", "2026-05-01": "노동절", "2026-05-05": "어린이날", "2026-05-24": "부처님오신날", "2026-05-25": "대체공휴일", "2026-06-03": "지방선거", "2026-06-06": "현충일", "2026-07-17": "제헌절", "2026-08-15": "광복절", "2026-08-17": "대체공휴일", "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴", "2026-10-03": "개천절", "2026-10-05": "대체공휴일", "2026-10-09": "한글날", "2026-12-25": "성탄절", "2027-01-01": "신정", "2027-02-06": "설날 연휴", "2027-02-07": "설날", "2027-02-08": "설날 연휴", "2027-02-09": "대체공휴일", "2027-03-01": "삼일절", "2027-05-01": "노동절", "2027-05-03": "대체공휴일", "2027-05-05": "어린이날", "2027-05-13": "부처님오신날", "2027-06-06": "현충일", "2027-07-17": "제헌절", "2027-07-19": "대체공휴일", "2027-08-15": "광복절", "2027-08-16": "대체공휴일", "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴", "2027-10-03": "개천절", "2027-10-04": "대체공휴일", "2027-10-09": "한글날", "2027-10-11": "대체공휴일", "2027-12-25": "성탄절", "2027-12-27": "대체공휴일"};
 function holKo(t){
   t=String(t||"").replace(/ \(.*\)$/,"").trim();
   if(HOL_KO[t])return HOL_KO[t];
@@ -863,6 +865,7 @@ function calBlock(f,sel=V.sel){
     const multi=e=>!e.time&&(pAll.has(evKey(e))||nAll.has(evKey(e)));
     const evs=AE.filter(e=>e.date===s&&pG(e)&&e.cat!=="hol").sort((a,b)=>(multi(b)-multi(a))||byTime(a,b));
     const hol=AE.filter(e=>e.date===s&&e.cat==="hol");
+    if(!hol.length&&KR_HOL[s])hol.push({title:KR_HOL[s],cat:"hol"});
     const tds=f==="g"?[]:S.todos.filter(t=>t.due===s&&!t.done&&pF(t));
     cells+=`<button class="cell ${d.getMonth()!==m-1?"out":""} ${s===td?"today":""} ${s===sel?"sel":""} ${hol.length?"holiday":""}" data-day="${s}" aria-label="${d.getMonth()+1}월 ${d.getDate()}일, 일정 ${evs.length}개">
       <span class="n">${d.getDate()}</span>
@@ -1221,7 +1224,7 @@ window.addEventListener("online",()=>{if(CFG.url){flush();loadAll()}});
 render();
 if(CFG.url)loadAll({first:FIRST_CONNECT});
 /* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
-const APP_VER="2026-10-02c";
+const APP_VER="2026-10-02d";
 async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
 setTimeout(checkUpdate,3000);
