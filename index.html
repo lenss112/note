@@ -920,12 +920,27 @@ function recPick(){
   for(const x of scored){if(out.length>=3)break;out.push(x)}
   return out;
 }
+/* 살 것 중 빨리 사면 좋을 것 (Claude가 inbox.json의 shopRec로 골라줌 + 2주 넘게 남은 것) */
+function shopPick(){
+  const td=today(),skip=lsGet("recskip:"+td)||[],rec=lsGet("shoprec")||[];
+  const open=S.shop.filter(x=>!x.done&&!skip.includes("sh:"+x.id)&&!S.todos.some(t=>t.id==="buy_"+x.id&&!t.done));
+  const out=[];
+  rec.forEach(r=>{const x=open.find(i=>i.title.replace(/\s/g,"")===String(r.title).replace(/\s/g,""));if(x&&!out.some(o=>o.x===x))out.push({x,why:r.why||"빨리 사면 좋아요"})});
+  open.forEach(x=>{const age=Math.floor((Date.now()-tcOf(x))/86400000);if(age>=14&&!out.some(o=>o.x===x))out.push({x,why:age+"일째 살 것 목록에 있어요"})});
+  return out.slice(0,2);
+}
+function buyAccept(id){const x=S.shop.find(i=>i.id===id);if(!x)return;
+  if(!S.todos.some(t=>t.id==="buy_"+id))S.todos.push({id:"buy_"+id,title:x.title+" 사기",cat:"life",due:today(),important:false,done:false,doneAt:null,created:Date.now()});
+  else S.todos.find(t=>t.id==="buy_"+id).due=today();
+  save("todos");render()}
 function recBox(){
-  const r=recPick();if(!r.length)return"";
+  const r=recPick(),sp=shopPick();if(!r.length&&!sp.length)return"";
   return `<section class="rec"><h3>✨ 오늘의 추천 <button class="textbtn" data-recall>전부 오케이</button></h3>
-  <p class="sub">언젠가 할 일 중에서 골랐어요. 큰 일은 지금 할 단계 하나만 보여줘요.</p>
+  <p class="sub">언젠가 할 일과 살 것 중에서 골랐어요. 큰 일은 지금 할 단계 하나만 보여줘요.</p>
   ${r.map(({t,why})=>`<div class="recrow"><div class="body"><div class="t">${tText(t)}</div><div class="why">${why.join(" · ")}</div></div>
-  <button class="ok" data-recok="${t.id}">오케이</button><button data-recskip="${t.id}">패스</button></div>`).join("")}</section>`;
+  <button class="ok" data-recok="${t.id}">오케이</button><button data-recskip="${t.id}">패스</button></div>`).join("")}
+  ${sp.map(({x,why})=>`<div class="recrow"><div class="body"><div class="t">🛍 ${esc(x.title)} 사기</div><div class="why">${esc(why)}</div></div>
+  <button class="ok" data-buyok="${x.id}">오케이</button><button data-recskip="sh:${x.id}">패스</button></div>`).join("")}</section>`;
 }
 function recAccept(ids){const td=today();ids.forEach(id=>{const t=S.todos.find(x=>x.id===id);if(t)t.due=td});save("todos");render()}
 
@@ -964,6 +979,9 @@ async function pullInbox(){
   try{
     const r=await fetch("./inbox.json?v="+Date.now(),{cache:"no-store"});if(!r.ok)return;
     const j=await r.json(),seen=lsGet("inbox:seen")||[];let ch=false;
+    if(Array.isArray(j.shopRec))lsSet("shoprec",j.shopRec);
+    (j.removeShop||[]).forEach(id=>{const k="rms:"+id;if(seen.includes(k))return;seen.push(k);
+      const n=S.shop.length;S.shop=S.shop.filter(x=>x.id!==id);if(S.shop.length!==n)save("shop"),render()});
     (j.remove||[]).forEach(id=>{const k="rm:"+id;if(seen.includes(k))return;seen.push(k);
       const n=S.todos.length;S.todos=S.todos.filter(t=>t.id!==id);if(S.todos.length!==n)ch=true});
     (j.todos||[]).forEach(x=>{
@@ -995,7 +1013,7 @@ function vToday(){
       ${todos.some(t=>!t.done)?todos.filter(t=>!t.done).map(duoTd).join(""):`<div class="dempty">${kit(todos.length?"k_hug":"k_sleep")}${todos.length?"오늘 할 일 끝!":"오늘 할 일 없음"}<br><button data-add="todo">추가</button></div>`}${doneFold(todos.filter(t=>t.done),duoTd)}</section>
     <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
       ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
-        <div class="body"><div class="t">${esc(x.title)}</div></div></div>`).join("")}</section>
+        <div class="body"><div class="t">${esc(x.title)}</div></div><button class="xbtn" data-shopdel="${x.id}" aria-label="${esc(x.title)} 지우기" title="안 사도 돼요">×</button></div>`).join("")}</section>
   </div>
   ${S.habits.length?`<h2>오늘의 루틴 <small>${S.habits.filter(x=>x.log?.[td]).length}/${S.habits.length}</small></h2>
   <div class="qh">${S.habits.map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>
@@ -1119,7 +1137,8 @@ document.getElementById("main").addEventListener("click",async e=>{
   if(g("[data-dayclose]")){V.homeSel=null;render();return}
   if(g("[data-showdone]")){V.showDone=!V.showDone;render();return}
   if(el=g("[data-recok]")){recAccept([el.dataset.recok]);return}
-  if(g("[data-recall]")){recAccept(recPick().map(x=>x.t.id));return}
+  if(el=g("[data-buyok]")){buyAccept(el.dataset.buyok);return}
+  if(g("[data-recall]")){recAccept(recPick().map(x=>x.t.id));shopPick().forEach(o=>buyAccept(o.x.id));return}
   if(el=g("[data-recskip]")){const k="recskip:"+today(),a=lsGet(k)||[];a.push(el.dataset.recskip);lsSet(k,a);render();return}
   if(g("[data-reload]")){loadAll({force:true});return}
   if(g("[data-connect]")){
@@ -1253,7 +1272,7 @@ document.addEventListener("drop",e=>{if(!dragId)return;const r=e.target.closest(
   items.forEach((t,i)=>{t.created=base+i*60000});                          // 1분 간격 → 시트에 저장돼도 순서 유지
   save("todos");render()});
 /* 새 버전이 올라오면 앱으로 돌아올 때 자동 새로고침 */
-const APP_VER="2026-10-02e";
+const APP_VER="2026-10-02f";
 async function checkUpdate(){try{const r=await fetch("./index.html?v="+Date.now(),{cache:"no-store"});const t=await r.text();const m=t.match(/APP_VER="([^"]+)"/);if(m&&m[1]!==APP_VER)location.reload()}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkUpdate()});
 setTimeout(checkUpdate,3000);
