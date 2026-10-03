@@ -115,5 +115,22 @@
   "ib1002t2": 60,
   "ib1002dance": 90,
   "ib1002t8": 30
- }
+ },
+ "travel": [
+  {
+   "title": "발레",
+   "before": 30,
+   "after": 30
+  },
+  {
+   "title": "11시 치과",
+   "before": 40,
+   "after": 40
+  },
+  {
+   "title": "스타티스회의",
+   "before": 30,
+   "after": 30
+  }
+ ]
 }
