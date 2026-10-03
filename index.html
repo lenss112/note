@@ -318,6 +318,25 @@ body.menu .drawer{transform:none} body.menu .drawer-scrim{opacity:1;pointer-even
 .scard td.b{font-weight:700}
 .scard td small{display:block;font-size:12.5px;color:var(--soft);font-weight:400;margin-top:2px}
 .sempty{color:var(--soft);font-size:14px}
+.scard{max-height:88vh;overflow-y:auto}
+.scard td:first-child{width:38%}
+.scard .sc{width:52px;text-align:center}
+.scheck{width:32px;height:32px;border-radius:50%;border:2px solid #FFA9C9;background:#fff;color:#fff;font-size:16px;line-height:1;cursor:pointer}
+.scheck.on{background:#FF8FB8;border-color:#FF8FB8}
+.scard tr.sdone td:nth-child(2){color:var(--soft);text-decoration:line-through}
+.stoday{font-size:14px;color:var(--soft);margin:2px 0 4px}.stoday b{color:var(--rose)}
+.strack{margin:10px 0 12px;padding-top:12px;border-top:1px dashed var(--line);cursor:default}
+.sthead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sthead b{font-family:"Jua",sans-serif;font-weight:400;font-size:17px}
+.sthead button{border:0;background:var(--rose-weak);border-radius:50%;width:30px;height:30px;font-size:17px;color:var(--ink)}
+.stgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.stgrid em{font-style:normal;text-align:center;font-size:11.5px;color:var(--soft)}
+.stgrid span{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--line);font-size:12.5px;font-variant-numeric:tabular-nums}
+.stgrid span:empty{border:0}
+.stgrid span.fut{opacity:.4}
+.stgrid span.isT{box-shadow:0 0 0 2px var(--ink)}
+.stleg{font-size:12px;color:var(--soft);margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:3px;vertical-align:-1px}
 input,textarea,select{font-size:16px!important}
 
 /* pink & white charm */
@@ -585,7 +604,15 @@ const SUPP_SEED=[{id:"s1",time:"아침 공복",name:"유산균"},{id:"s2",time:"
 let SUPPS=lsGet("supps")||SUPP_SEED;
 const SITE_DEF={title:"姫の手帳",footer:"업무 · 개인 · 취미",suppTitle:"영양제"};
 let SITE={...SITE_DEF,...(lsGet("site")||{})};
-let suppOpen=false;
+let suppOpen=false,suppMon=null;
+const SUPP_H="supp-";                                   // 영양제 체크 기록은 '루틴' 탭에 supp-로 시작하는 id로 저장돼요
+const isSuppH=h=>String(h.id).startsWith(SUPP_H);
+const suppH=x=>S.habits.find(h=>h.id===SUPP_H+x.id);
+const suppDone=(x,d)=>!!suppH(x)?.log?.[d];
+const suppRatio=d=>SUPPS.length?SUPPS.filter(x=>suppDone(x,d)).length/SUPPS.length:0;
+function suppToggle(sid,d){const x=SUPPS.find(y=>y.id===sid);if(!x)return;
+  let h=suppH(x);if(!h){h={id:SUPP_H+x.id,name:"💊 "+x.name,cat:"life",log:{}};S.habits.push(h)}
+  h.log={...(h.log||{})};if(h.log[d])delete h.log[d];else h.log[d]=true;save("habits");paintSupp()}
 let V={homeSel:null,tab:"today",filter:"all",month:today().slice(0,7),sel:today(),q:"",showDone:false};
 
 /* ---------- local cache ---------- */
@@ -821,14 +848,30 @@ function paintSupp(){
   el.classList.toggle("open",suppOpen);el.setAttribute("aria-hidden",!suppOpen);
   document.querySelectorAll("[data-supp]").forEach(b=>b.setAttribute("aria-pressed",suppOpen));
   if(!suppOpen)return;
+  const td=today();
   el.querySelector(".scard").innerHTML=`${kit("k_doc","kdoc")}<div class="shead"><h3>${ic("pills")}${esc(SITE.suppTitle)}</h3><button class="sclose" data-suppclose aria-label="닫기">×</button></div>
-    <table><thead><tr><th>시간</th><th>영양제</th></tr></thead><tbody>
-    ${SUPPS.length?SUPPS.map(x=>`<tr><td>${esc(x.time)}</td><td class="${x.bold?"b":""}">${esc(x.name)}${x.note?`<small>${esc(x.note)}</small>`:""}</td></tr>`).join(""):`<tr><td colspan="2" class="sempty">스프레드시트 '영양제' 탭에 추가해 주세요.</td></tr>`}
-    </tbody></table>`;
+    <div class="stoday">오늘 <b>${SUPPS.filter(x=>suppDone(x,td)).length}/${SUPPS.length}</b> 먹었어요${SUPPS.length&&suppRatio(td)===1?" 🎀":""}</div>
+    <table><thead><tr><th>시간</th><th>영양제</th><th class="sc">체크</th></tr></thead><tbody>
+    ${SUPPS.length?SUPPS.map(x=>`<tr class="${suppDone(x,td)?"sdone":""}"><td>${esc(x.time)}</td><td class="${x.bold?"b":""}">${esc(x.name)}${x.note?`<small>${esc(x.note)}</small>`:""}</td><td class="sc"><button class="scheck ${suppDone(x,td)?"on":""}" data-scheck="${esc(x.id)}" aria-label="${esc(x.name)} ${suppDone(x,td)?"먹음 취소":"먹음"}">${suppDone(x,td)?"✓":""}</button></td></tr>`).join(""):`<tr><td colspan="3" class="sempty">스프레드시트 '영양제' 탭에 추가해 주세요.</td></tr>`}
+    </tbody></table>${suppTracker()}`;
 }
-function toggleSupp(o){suppOpen=o===undefined?!suppOpen:o;paintSupp()}
+function suppTracker(){
+  const td=today(),ym=suppMon||td.slice(0,7),[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),n=new Date(y,m,0).getDate();
+  let cells="";for(let i=0;i<first.getDay();i++)cells+=`<span></span>`;
+  let full=0;
+  for(let d=1;d<=n;d++){const ds=`${ym}-${pad(d)}`,r=suppRatio(ds),fut=ds>td;if(r===1)full++;
+    const bg=fut||!r?"":r===1?"background:#FF8FB8;color:#fff;border-color:#FF8FB8":`background:rgba(255,143,184,${(0.18+r*0.5).toFixed(2)})`;
+    cells+=`<span class="${fut?"fut":""} ${ds===td?"isT":""}" style="${bg}" title="${d}일 ${Math.round(r*SUPPS.length)}/${SUPPS.length}">${r===1?"♥":d}</span>`}
+  return `<div class="strack"><div class="sthead"><button data-smon="-1" aria-label="이전 달">‹</button><b>${m}월 해빗트래커</b><button data-smon="1" aria-label="다음 달">›</button></div>
+    <div class="stgrid">${["일","월","화","수","목","금","토"].map(w=>`<em>${w}</em>`).join("")}${cells}</div>
+    <div class="stleg"><span><i style="background:rgba(255,143,184,.35)"></i>조금</span><span><i style="background:#FF8FB8"></i>다 먹음</span> · 이번 달 다 먹은 날 <b>${full}</b>일</div></div>`;
+}
+function toggleSupp(o){suppOpen=o===undefined?!suppOpen:o;if(!suppOpen)suppMon=null;paintSupp()}
 document.addEventListener("click",e=>{
   if(e.target.closest("[data-supp]")){openMenu(false);toggleSupp();return}
+  if(suppOpen&&e.target.closest("[data-scheck]")){suppToggle(e.target.closest("[data-scheck]").dataset.scheck,today());return}
+  if(suppOpen&&e.target.closest("[data-smon]")){const ym=suppMon||today().slice(0,7),[y,m]=ym.split("-").map(Number),d=new Date(y,m-1+(+e.target.closest("[data-smon]").dataset.smon),1);suppMon=d.getFullYear()+"-"+pad(d.getMonth()+1);paintSupp();return}
+  if(suppOpen&&(e.target.closest(".strack")||e.target.closest(".stoday")))return;
   if(suppOpen&&(e.target.closest("[data-suppclose]")||e.target.id==="supp"||e.target.closest(".scard"))){toggleSupp(false)}
 });
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&suppOpen)toggleSupp(false)});
@@ -1065,7 +1108,7 @@ function travelAsk(ds){ // 아직 이동시간 안 정한, 이동하는 것 같�
   return allEvents().filter(e=>e.date===ds&&e.time&&e.cat!=="hol"&&looksMove(e)&&!tvOf(e)).filter(e=>{const k=tvKey(e);if(seen.has(k))return false;seen.add(k);return true});
 }
 /* ---------- 동그란 하루 계획표 (0~24시, 생활계획표처럼) ---------- */
-const PLAN={sleep:[23,7],work:[9,18]};            // 목표: 23시~7시 잠, 9시~18시 일 (평일만)
+const PLAN={sleep:[23,7],work:[9,18],meal:[[18*60+30,19*60+30,"저녁"]],water:21*60+30};   // 매일 저녁 6:30~7:30 식사, 물은 9:30까지            // 목표: 23시~7시 잠, 9시~18시 일 (평일만)
 const hmOf=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?Math.min(1440,(+m[1])*60+(+m[2])):null};
 const hmTxt=n=>pad(Math.floor(n/60))+":"+pad(n%60);
 function isWorkday(ds){const w=parse(ds).getDay();
@@ -1076,8 +1119,14 @@ function planBlocks(ds){
   if(work){b.push({s:s1*60,e:w0*60,k:"free",l:"준비"});b.push({s:w0*60,e:w1*60,k:"work",l:"일"});b.push({s:w1*60,e:s0*60,k:"free",l:"자유"})}
   else b.push({s:s1*60,e:s0*60,k:"free",l:"자유"});
   b.push({s:s0*60,e:1440,k:"sleep",l:"잠"});
-  return b;
+  let out=b;
+  PLAN.meal.forEach(([m0,m1,l])=>{const nb=[];
+    out.forEach(x=>{if(x.e<=m0||x.s>=m1){nb.push(x);return}
+      if(x.s<m0)nb.push({...x,e:m0});nb.push({s:Math.max(x.s,m0),e:Math.min(x.e,m1),k:"meal",l});if(x.e>m1)nb.push({...x,s:m1})});
+    out=nb.filter((x,i,a)=>!(x.k==="meal"&&i&&a[i-1].k==="meal"&&a[i-1].e===x.s));});
+  return out;
 }
+const hTxt=m=>m%60?`${Math.floor(m/60)}:${pad(m%60)}`:`${m/60}`;
 function dayTimed(ds){
   const ev=allEvents().filter(e=>e.date===ds&&e.time&&e.cat!=="hol").map(e=>{
     const s=hmOf(e.time);let en=hmOf(e.end);if(en==null||en<=s)en=Math.min(1440,s+60);
@@ -1094,18 +1143,21 @@ function clockSvg(ds){
     if(!r1)return `<path d="M${C} ${C}L${a} ${b}A${r2} ${r2} 0 ${L} 1 ${c} ${d}Z" fill="${fill}" ${extra}/>`;
     const[e,f]=P(r1,m2),[g,h]=P(r1,m1);
     return `<path d="M${a} ${b}A${r2} ${r2} 0 ${L} 1 ${c} ${d}L${e} ${f}A${r1} ${r1} 0 ${L} 0 ${g} ${h}Z" fill="${fill}" ${extra}/>`};
-  const FILL={sleep:"#E6E0F7",work:"#FFD3E3",free:"#FFFFFF"},INK={sleep:"#6B5BA8",work:"#8C2E57",free:"#B27C96"};
-  let o=`<svg viewBox="0 0 380 380" role="img" aria-label="${esc(fmtDate(ds))} 하루 계획표">`;
+  const FILL={sleep:"#E6E0F7",work:"#FFD3E3",free:"#FFFFFF",meal:"#FFF1C2"},INK={sleep:"#6B5BA8",work:"#8C2E57",free:"#B27C96",meal:"#9A6A00"};
+  let o=`<svg viewBox="0 0 380 380" role="img" aria-label="${esc(fmtDate(ds))} 생활계획표">`;
   o+=`<circle cx="${C}" cy="${C}" r="157" fill="#FFF9FB" stroke="#F9D3E2"/>`;
   const blocks=planBlocks(ds);
   blocks.forEach(b=>{o+=sect(0,118,b.s,b.e,FILL[b.k],`stroke="#F9D3E2" stroke-width="1"`)});
   // 블록 이름 (자정을 넘는 잠은 한 번만)
   const lab=[];const sl=blocks.filter(b=>b.k==="sleep");
   lab.push({k:"sleep",l:"잠",mid:(PLAN.sleep[0]*60+(PLAN.sleep[1]*60+1440))/2%1440,t:`${PLAN.sleep[0]}~${PLAN.sleep[1]}시`});
-  blocks.filter(b=>b.k!=="sleep").forEach(b=>lab.push({k:b.k,l:b.l,mid:(b.s+b.e)/2,t:`${b.s/60}~${b.e/60}시`,small:b.e-b.s<180}));
+  blocks.filter(b=>b.k!=="sleep"&&b.e-b.s>=50).forEach(b=>lab.push({k:b.k,l:b.l,mid:(b.s+b.e)/2,t:`${hTxt(b.s)}~${hTxt(b.e)}시`,small:b.e-b.s<180}));
   lab.forEach(x=>{const[cx,cy]=P(x.small?88:80,x.mid);
-    o+=`<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${x.small?12:15}" fill="${INK[x.k]}" font-family="Jua,sans-serif">${x.k==="sleep"?"🌙 ":x.k==="work"?"💼 ":""}${x.l}</text>`;
+    o+=`<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${x.small?12:15}" fill="${INK[x.k]}" font-family="Jua,sans-serif">${x.k==="sleep"?"🌙 ":x.k==="work"?"💼 ":x.k==="meal"?"🍚":""}${x.l}</text>`;
     if(!x.small)o+=`<text x="${cx}" y="${+cy+15}" text-anchor="middle" font-size="10.5" fill="${INK[x.k]}" opacity=".8">${x.t}</text>`});
+  // 물 규칙: 9시 반 이후엔 그만
+  {const[a,b]=P(118,PLAN.water),[c,d]=P(36,PLAN.water),[wx,wy]=P(104,PLAN.water+22);
+    o+=`<line x1="${c}" y1="${d}" x2="${a}" y2="${b}" stroke="#5B9BD5" stroke-width="1.8" stroke-dasharray="4 3"/><text x="${wx}" y="${+wy+4}" text-anchor="middle" font-size="12">💧</text>`}
   // 일정 링
   const{ev,n}=dayTimed(ds),R1=122,R2=155,w=(R2-R1)/n;
   ev.forEach(x=>{const r1=R1+x.lane*w,r2=r1+w-1;
@@ -1124,7 +1176,7 @@ function clockSvg(ds){
   if(isT){const[a,b]=P(160,nm);o+=`<line x1="${C}" y1="${C}" x2="${a}" y2="${b}" stroke="#1F1A1C" stroke-width="2.4" stroke-linecap="round"/><circle cx="${a}" cy="${b}" r="4" fill="#FFA9C9" stroke="#1F1A1C" stroke-width="1.5"/>`}
   o+=`<circle cx="${C}" cy="${C}" r="33" fill="#fff" stroke="#F9D3E2"/>`;
   if(isT){const cur=blocks.find(b=>nm>=b.s&&nm<b.e)||blocks[0];
-    o+=`<text x="${C}" y="${C-2}" text-anchor="middle" font-size="16" fill="#1F1A1C" font-family="Jua,sans-serif">${hmTxt(nm)}</text><text x="${C}" y="${C+14}" text-anchor="middle" font-size="10.5" fill="#B27C96">${{sleep:"잘 시간",work:"일하는 중",free:cur.l==="준비"?"준비 시간":"자유 시간"}[cur.k]}</text>`}
+    o+=`<text x="${C}" y="${C-2}" text-anchor="middle" font-size="16" fill="#1F1A1C" font-family="Jua,sans-serif">${hmTxt(nm)}</text><text x="${C}" y="${C+14}" text-anchor="middle" font-size="10.5" fill="#B27C96">${nm>=PLAN.water&&nm<PLAN.sleep[0]*60?"물은 그만 💧":{sleep:"잘 시간",work:"일하는 중",meal:"저녁 먹을 시간",free:cur.l==="준비"?"준비 시간":"자유 시간"}[cur.k]}</text>`}
   else{const d=parse(ds);o+=`<text x="${C}" y="${C+6}" text-anchor="middle" font-size="16" fill="#5B2A43" font-family="Jua,sans-serif">${d.getMonth()+1}/${d.getDate()}</text>`}
   return o+`</svg>`;
 }
@@ -1133,6 +1185,7 @@ function clockView(){
   const allday=allEvents().filter(e=>e.date===ds&&!e.time);
   const nm=(d=>d.getHours()*60+d.getMinutes())(new Date()),isT=ds===today();
   const inSleep=ev.filter(x=>blocks.some(b=>b.k==="sleep"&&x.s<b.e&&x.en>b.s));
+  const inMeal=ev.filter(x=>blocks.some(b=>b.k==="meal"&&x.s<b.e&&x.en>b.s));
   const sum=k=>blocks.filter(b=>b.k===k).reduce((a,b)=>a+b.e-b.s,0)/60;
   const askTv=travelAsk(ds),tdOpen=S.todos.filter(t=>!t.done&&t.due===ds),tdMin=sumMins(tdOpen);
   let freeLeft=null;if(isT){freeLeft=0;blocks.filter(b=>b.k==="free").forEach(b=>{for(let m=Math.max(b.s,nm);m<b.e;m+=5){if(!ev.some(x=>m>=x.ts&&m<x.te))freeLeft+=5}})}
@@ -1141,9 +1194,10 @@ function clockView(){
       <button class="iconbtn" data-cday="-1" aria-label="전날">‹</button><button class="textbtn" data-cday="0">오늘</button><button class="iconbtn" data-cday="1" aria-label="다음날">›</button></div>
     ${allday.length?`<div class="clkallday">${allday.map(e=>`<span>${e.cat==="hol"?"🌸 ":""}${esc(e.title)}</span>`).join("")}</div>`:""}
     <div class="clkwrap">${clockSvg(ds)}</div>
-    <div class="clkleg"><span><i style="background:#E6E0F7"></i>잠 ${sum("sleep")}시간</span>${sum("work")?`<span><i style="background:#FFD3E3"></i>일 ${sum("work")}시간</span>`:""}<span><i style="background:#fff"></i>자유 ${sum("free")}시간</span><span><i style="background:#1F1A1C;border-color:#1F1A1C"></i>일정</span><span><i style="background:#FFA9C9;border-color:#FFA9C9"></i>이동</span></div>
+    <div class="clkleg"><span><i style="background:#E6E0F7"></i>잠 ${sum("sleep")}시간</span>${sum("work")?`<span><i style="background:#FFD3E3"></i>일 ${sum("work")}시간</span>`:""}<span><i style="background:#fff"></i>자유 ${sum("free")}시간</span><span><i style="background:#FFF1C2"></i>🍚 저녁 6:30~7:30</span><span>💧 물은 9:30까지</span><span><i style="background:#1F1A1C;border-color:#1F1A1C"></i>일정</span><span><i style="background:#FFA9C9;border-color:#FFA9C9"></i>이동</span></div>
     ${askTv.map(e=>`<div class="tvask"><div class="q">🚃 <b>${esc(e.title)}</b> ${esc(e.time)} — 가는 데 얼마나 걸려요?</div><div class="b">${[10,20,30,45,60,90].map(n=>`<button data-tv="${n}" data-tvk="${esc(tvKey(e))}">${minTxt(n)}</button>`).join("")}<button data-tv="?" data-tvk="${esc(tvKey(e))}">직접</button><button data-tv="0" data-tvk="${esc(tvKey(e))}">이동 없음</button></div></div>`).join("")}
     ${tdMin?`<div class="clksum">오늘 할일 ${tdOpen.length}개 · 약 ${minTxt(tdMin)} 걸려요${freeLeft!=null?` · 남은 자유 시간 ${minTxt(freeLeft)}`:""}</div>`:""}
+    ${inMeal.length?`<div class="clkwarn">🍚 저녁 시간에 걸친 일정이 있어요 — 앞뒤로 미리 챙겨 먹어요</div>`:""}
     ${inSleep.length?`<div class="clkwarn">🌙 잘 시간에 걸친 일정이 ${inSleep.length}개 있어요</div>`:""}
     <div class="clklist">${ev.length?ev.map(x=>`${x.tb?`<div class="r tv"><span class="tm">${hmTxt(x.ts)}~${hmTxt(x.s)}</span><span>🚃 이동</span></div>`:""}<div class="r${isT&&nm>=x.s&&nm<x.en?" now":""}"><span class="tm">${hmTxt(x.s)}~${hmTxt(x.en)}</span><span>${ic(stickerOf(x.e),"stk")}${esc(x.e.title)}${looksMove(x.e)&&tvOf(x.e)?` <button class="tvedit" data-tvreset="${esc(tvKey(x.e))}">이동 ${minTxt(+tvOf(x.e).before||0)} ✎</button>`:""}</span></div>${x.ta?`<div class="r tv"><span class="tm">${hmTxt(x.en)}~${hmTxt(x.te)}</span><span>🚃 돌아오기</span></div>`:""}`).join(""):`<div class="empty">시간이 정해진 일정이 없어요</div>`}</div>
   </section>`;
@@ -1159,7 +1213,7 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline"><span class="dday">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})</span><span class="wx" id="wx">${wxHtml()}</span><span class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
-  <div class="viewsw"><button data-clock aria-pressed="${!!V.clock}">${V.clock?"📋 목록으로 보기":"🕐 동그란 계획표"+(travelAsk(td).length?` <span class="tvbadge">이동시간 ${travelAsk(td).length}개 물어봐요</span>`:"")}</button></div>
+  <div class="viewsw"><button data-clock aria-pressed="${!!V.clock}">${V.clock?"📋 목록으로 보기":"🕐 생활계획표"+(travelAsk(td).length?` <span class="tvbadge">이동시간 ${travelAsk(td).length}개 물어봐요</span>`:"")}</button></div>
   ${V.clock?clockView():`
   ${recBox()}
   <div class="duo home3">
@@ -1171,9 +1225,9 @@ function vToday(){
       ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
         <div class="body"><div class="t">${esc(x.title)}</div></div><button class="xbtn" data-shopdel="${x.id}" aria-label="${esc(x.title)} 지우기" title="안 사도 돼요">×</button></div>`).join("")}</section>
   </div>
-  ${S.habits.length?`<h2>오늘의 루틴 <small>${S.habits.filter(x=>x.log?.[td]).length}/${S.habits.length}</small></h2>
-  <div class="qh">${S.habits.map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>
-  ${S.habits.every(x=>x.log?.[td])?`<div class="alldone">${kit("k_hug")}오늘 루틴 다 했어요!</div>`:""}`:""}
+  ${HB().length?`<h2>오늘의 루틴 <small>${HB().filter(x=>x.log?.[td]).length}/${HB().length}</small></h2>
+  <div class="qh">${HB().map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>
+  ${HB().every(x=>x.log?.[td])?`<div class="alldone">${kit("k_hug")}오늘 루틴 다 했어요!</div>`:""}`:""}
   ${pinned.length?`<h2>고정한 메모</h2><div class="notes">${pinned.map(noteCard).join("")}</div>`:""}
   <h2 class="monthh">이번 달</h2>
   ${calBlock("all",V.homeSel)}
@@ -1225,9 +1279,10 @@ function vNote(){
 }
 
 function streak(h){let s=0,d=today();if(!h.log?.[d])d=addDays(d,-1);while(h.log?.[d]){s++;d=addDays(d,-1)}return s}
+const HB=()=>S.habits.filter(h=>!isSuppH(h));
 function vHabit(){
   const td=today();const days=[...Array(7)].map((_,i)=>addDays(td,i-6));
-  const a=S.habits.filter(x=>V.filter==="all"||x.cat===V.filter);
+  const a=HB().filter(x=>V.filter==="all"||x.cat===V.filter);
   return `${banner()}${chips()}
   ${a.length?`<div class="hlist">${a.map(h=>{
     const n30=[...Array(30)].map((_,i)=>addDays(td,-i)).filter(d=>h.log?.[d]).length;
