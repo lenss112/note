@@ -379,7 +379,9 @@ function gcal_(from, to) {
       } else {
         const s = ev.getStartTime();
         const d = Utilities.formatDate(s, TZ, 'yyyy-MM-dd');
-        out.push(Object.assign({}, base, { id: base.id + '_' + d, date: d, time: Utilities.formatDate(s, TZ, 'HH:mm') }));
+        const en = ev.getEndTime(), ed = Utilities.formatDate(en, TZ, 'yyyy-MM-dd');
+        out.push(Object.assign({}, base, { id: base.id + '_' + d, date: d, time: Utilities.formatDate(s, TZ, 'HH:mm'),
+          end: ed === d ? Utilities.formatDate(en, TZ, 'HH:mm') : '24:00' }));   // 동그란 계획표에서 일정 길이 그리기용
       }
     });
   });

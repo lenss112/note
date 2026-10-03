@@ -474,6 +474,26 @@ h2 .ic.hic{width:22px;height:22px;vertical-align:-4px}
 .daybox{margin-top:12px;grid-template-rows:auto 1fr}
 .daybox .dhead{grid-column:1/-1;display:flex;align-items:center;padding:10px 12px 0;font-family:"Jua",sans-serif;font-size:17px}
 .daybox .dhead b{flex:1;font-weight:400}
+
+/* ---------- 동그란 하루 계획표 ---------- */
+.viewsw{display:flex;justify-content:flex-end;margin:0 2px 10px}
+.viewsw button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;font-size:13.5px;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.viewsw button[aria-pressed="true"]{background:var(--rose);color:#fff;border-color:var(--rose)}
+.clk{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px 12px 16px}
+.clkhead{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.clkhead b{flex:1;font-family:"Jua",sans-serif;font-weight:400;font-size:18px;padding-left:4px}
+.clkwrap{max-width:420px;margin:0 auto}
+.clkwrap svg{display:block;width:100%;height:auto;font-family:"Gowun Dodum",sans-serif}
+.clkleg{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;font-size:12.5px;color:var(--soft);margin:8px 0 2px}
+.clkleg i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px;border:1px solid var(--line)}
+.clkallday{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:2px 0 8px}
+.clkallday span{font-size:12.5px;background:var(--rose-weak);border-radius:999px;padding:3px 10px}
+.clkwarn{font-size:12.5px;color:var(--warn);text-align:center;margin-top:6px}
+.clklist{margin-top:12px;border-top:1px solid var(--line)}
+.clklist .r{display:flex;gap:10px;align-items:baseline;padding:9px 4px;border-bottom:1px solid var(--line);font-size:14px}
+.clklist .r .tm{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;min-width:86px}
+.clklist .r.now{background:var(--rose-weak);border-radius:8px}
+.clklist .empty{text-align:center}
 </style>
 </head>
 <body>
@@ -994,6 +1014,83 @@ async function pullInbox(){
     if(ch){save("todos");render()}
   }catch(e){}
 }
+/* ---------- 동그란 하루 계획표 (0~24시, 생활계획표처럼) ---------- */
+const PLAN={sleep:[23,7],work:[9,18]};            // 목표: 23시~7시 잠, 9시~18시 일 (평일만)
+const hmOf=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||"");return m?Math.min(1440,(+m[1])*60+(+m[2])):null};
+const hmTxt=n=>pad(Math.floor(n/60))+":"+pad(n%60);
+function isWorkday(ds){const w=parse(ds).getDay();
+  return w>0&&w<6&&!KR_HOL[ds]&&!allEvents().some(e=>e.date===ds&&e.cat==="hol")}
+function planBlocks(ds){
+  const[s0,s1]=PLAN.sleep,[w0,w1]=PLAN.work,work=isWorkday(ds),b=[];
+  b.push({s:0,e:s1*60,k:"sleep",l:"잠"});
+  if(work){b.push({s:s1*60,e:w0*60,k:"free",l:"준비"});b.push({s:w0*60,e:w1*60,k:"work",l:"일"});b.push({s:w1*60,e:s0*60,k:"free",l:"자유"})}
+  else b.push({s:s1*60,e:s0*60,k:"free",l:"자유"});
+  b.push({s:s0*60,e:1440,k:"sleep",l:"잠"});
+  return b;
+}
+function dayTimed(ds){
+  const ev=allEvents().filter(e=>e.date===ds&&e.time&&e.cat!=="hol").map(e=>{
+    const s=hmOf(e.time);let en=hmOf(e.end);if(en==null||en<=s)en=Math.min(1440,s+60);
+    return{e,s,en,guess:hmOf(e.end)==null}}).filter(x=>x.s!=null).sort((a,b)=>a.s-b.s||b.en-a.en);
+  const lanes=[];ev.forEach(x=>{let i=lanes.findIndex(end=>end<=x.s);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=x.en;x.lane=i});
+  return{ev,n:Math.max(1,lanes.length)};
+}
+function clockSvg(ds){
+  const C=190,deg=m=>m/1440*2*Math.PI,P=(r,m)=>[(C+r*Math.sin(deg(m))).toFixed(1),(C-r*Math.cos(deg(m))).toFixed(1)];
+  const sect=(r1,r2,m1,m2,fill,extra="")=>{
+    if(m2-m1>=1440)return `<circle cx="${C}" cy="${C}" r="${(r1+r2)/2}" fill="none" stroke="${fill}" stroke-width="${r2-r1}" ${extra}/>`;
+    const L=m2-m1>720?1:0,[a,b]=P(r2,m1),[c,d]=P(r2,m2);
+    if(!r1)return `<path d="M${C} ${C}L${a} ${b}A${r2} ${r2} 0 ${L} 1 ${c} ${d}Z" fill="${fill}" ${extra}/>`;
+    const[e,f]=P(r1,m2),[g,h]=P(r1,m1);
+    return `<path d="M${a} ${b}A${r2} ${r2} 0 ${L} 1 ${c} ${d}L${e} ${f}A${r1} ${r1} 0 ${L} 0 ${g} ${h}Z" fill="${fill}" ${extra}/>`};
+  const FILL={sleep:"#E6E0F7",work:"#FFD3E3",free:"#FFFFFF"},INK={sleep:"#6B5BA8",work:"#8C2E57",free:"#B27C96"};
+  let o=`<svg viewBox="0 0 380 380" role="img" aria-label="${esc(fmtDate(ds))} 하루 계획표">`;
+  o+=`<circle cx="${C}" cy="${C}" r="157" fill="#FFF9FB" stroke="#F9D3E2"/>`;
+  const blocks=planBlocks(ds);
+  blocks.forEach(b=>{o+=sect(0,118,b.s,b.e,FILL[b.k],`stroke="#F9D3E2" stroke-width="1"`)});
+  // 블록 이름 (자정을 넘는 잠은 한 번만)
+  const lab=[];const sl=blocks.filter(b=>b.k==="sleep");
+  lab.push({k:"sleep",l:"잠",mid:(PLAN.sleep[0]*60+(PLAN.sleep[1]*60+1440))/2%1440,t:`${PLAN.sleep[0]}~${PLAN.sleep[1]}시`});
+  blocks.filter(b=>b.k!=="sleep").forEach(b=>lab.push({k:b.k,l:b.l,mid:(b.s+b.e)/2,t:`${b.s/60}~${b.e/60}시`,small:b.e-b.s<180}));
+  lab.forEach(x=>{const[cx,cy]=P(x.small?88:80,x.mid);
+    o+=`<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${x.small?12:15}" fill="${INK[x.k]}" font-family="Jua,sans-serif">${x.k==="sleep"?"🌙 ":x.k==="work"?"💼 ":""}${x.l}</text>`;
+    if(!x.small)o+=`<text x="${cx}" y="${+cy+15}" text-anchor="middle" font-size="10.5" fill="${INK[x.k]}" opacity=".8">${x.t}</text>`});
+  // 일정 링
+  const{ev,n}=dayTimed(ds),R1=122,R2=155,w=(R2-R1)/n;
+  ev.forEach(x=>{const r1=R1+x.lane*w,r2=r1+w-1;
+    o+=sect(r1,r2,x.s,Math.max(x.en,x.s+10),"#1F1A1C",`stroke="#fff" stroke-width="1"`);
+    const dur=x.en-x.s;if(n===1&&dur>=45){const[cx,cy]=P((R1+R2)/2,(x.s+x.en)/2);
+      const k=Math.max(2,Math.min(8,Math.floor(dur/60*2.2))),t=[...String(x.e.title)];
+      o+=`<text x="${cx}" y="${+cy+3.5}" text-anchor="middle" font-size="9.5" fill="#fff">${esc(t.length>k?t.slice(0,k).join("")+"…":t.join(""))}</text>`}});
+  // 시각 눈금
+  for(let h=0;h<24;h++){const m=h*60,big=h%6===0,[a,b]=P(157,m),[c,d]=P(big?163:161,m),[tx,ty]=P(173,m);
+    o+=`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#B27C96" stroke-width="${big?1.6:1}"/>`;
+    o+=`<text x="${tx}" y="${+ty+3.8}" text-anchor="middle" font-size="${big?12:10.5}" fill="${big?"#5B2A43":"#B27C96"}" ${big?'font-weight="700"':""}>${h}</text>`}
+  // 지금 시각
+  const isT=ds===today(),nd=new Date(),nm=nd.getHours()*60+nd.getMinutes();
+  if(isT){const[a,b]=P(160,nm);o+=`<line x1="${C}" y1="${C}" x2="${a}" y2="${b}" stroke="#1F1A1C" stroke-width="2.4" stroke-linecap="round"/><circle cx="${a}" cy="${b}" r="4" fill="#FFA9C9" stroke="#1F1A1C" stroke-width="1.5"/>`}
+  o+=`<circle cx="${C}" cy="${C}" r="33" fill="#fff" stroke="#F9D3E2"/>`;
+  if(isT){const cur=blocks.find(b=>nm>=b.s&&nm<b.e)||blocks[0];
+    o+=`<text x="${C}" y="${C-2}" text-anchor="middle" font-size="16" fill="#1F1A1C" font-family="Jua,sans-serif">${hmTxt(nm)}</text><text x="${C}" y="${C+14}" text-anchor="middle" font-size="10.5" fill="#B27C96">${{sleep:"잘 시간",work:"일하는 중",free:cur.l==="준비"?"준비 시간":"자유 시간"}[cur.k]}</text>`}
+  else{const d=parse(ds);o+=`<text x="${C}" y="${C+6}" text-anchor="middle" font-size="16" fill="#5B2A43" font-family="Jua,sans-serif">${d.getMonth()+1}/${d.getDate()}</text>`}
+  return o+`</svg>`;
+}
+function clockView(){
+  const ds=V.clockDay||today(),{ev}=dayTimed(ds),blocks=planBlocks(ds);
+  const allday=allEvents().filter(e=>e.date===ds&&!e.time);
+  const nm=(d=>d.getHours()*60+d.getMinutes())(new Date()),isT=ds===today();
+  const inSleep=ev.filter(x=>blocks.some(b=>b.k==="sleep"&&x.s<b.e&&x.en>b.s));
+  const sum=k=>blocks.filter(b=>b.k===k).reduce((a,b)=>a+b.e-b.s,0)/60;
+  return `<section class="clk">
+    <div class="clkhead"><b>${fmtDate(ds)}</b>
+      <button class="iconbtn" data-cday="-1" aria-label="전날">‹</button><button class="textbtn" data-cday="0">오늘</button><button class="iconbtn" data-cday="1" aria-label="다음날">›</button></div>
+    ${allday.length?`<div class="clkallday">${allday.map(e=>`<span>${e.cat==="hol"?"🌸 ":""}${esc(e.title)}</span>`).join("")}</div>`:""}
+    <div class="clkwrap">${clockSvg(ds)}</div>
+    <div class="clkleg"><span><i style="background:#E6E0F7"></i>잠 ${sum("sleep")}시간</span>${sum("work")?`<span><i style="background:#FFD3E3"></i>일 ${sum("work")}시간</span>`:""}<span><i style="background:#fff"></i>자유 ${sum("free")}시간</span><span><i style="background:#1F1A1C;border-color:#1F1A1C"></i>일정</span></div>
+    ${inSleep.length?`<div class="clkwarn">🌙 잘 시간에 걸친 일정이 ${inSleep.length}개 있어요</div>`:""}
+    <div class="clklist">${ev.length?ev.map(x=>`<div class="r${isT&&nm>=x.s&&nm<x.en?" now":""}"><span class="tm">${hmTxt(x.s)}~${x.guess?"":hmTxt(x.en)}</span><span>${ic(stickerOf(x.e),"stk")}${esc(x.e.title)}</span></div>`).join(""):`<div class="empty">시간이 정해진 일정이 없어요</div>`}</div>
+  </section>`;
+}
 function vToday(){
   const td=today(),d=new Date();
   const evs=allEvents().filter(e=>e.date===td).sort(byTime);
@@ -1005,6 +1102,8 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline"><span class="dday">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})</span><span class="wx" id="wx">${wxHtml()}</span><span class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
+  <div class="viewsw"><button data-clock aria-pressed="${!!V.clock}">${V.clock?"📋 목록으로 보기":"🕐 동그란 계획표"}</button></div>
+  ${V.clock?clockView():`
   ${recBox()}
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
@@ -1027,7 +1126,7 @@ function vToday(){
     <form class="quick" data-quick="someday"><input placeholder="언젠가 해보고 싶은 일" aria-label="언젠가 할 일 추가" autocomplete="off"><button type="submit">추가</button></form>
     ${somedayRows(someday.filter(t=>!t.done))}
     ${doneFold(someday.filter(t=>t.done),todoRow)}
-  </div>`;
+  </div>`}`;
 }
 
 function vCal(){
@@ -1135,6 +1234,9 @@ document.getElementById("main").addEventListener("click",async e=>{
     openSheet(t,S[k].find(x=>x.id===el.dataset.id));return}
   if(el=g("[data-add]")){const inDay=el.closest("#daybox");openSheet(el.dataset.add,null,V.tab==="cal"?{date:V.sel}:inDay?{date:V.homeSel}:{});return}
   if(g("[data-dayclose]")){V.homeSel=null;render();return}
+  if(g("[data-clock]")){V.clock=!V.clock;if(!V.clock)V.clockDay=null;render();return}
+  if(el=g("[data-cday]")){const v=+el.dataset.cday;V.clockDay=v===0?today():addDays(V.clockDay||today(),v);
+    if(V.clockDay.slice(0,7)!==V.month){V.month=V.clockDay.slice(0,7);gLoad()}render();return}
   if(g("[data-showdone]")){V.showDone=!V.showDone;render();return}
   if(el=g("[data-recok]")){recAccept([el.dataset.recok]);return}
   if(el=g("[data-buyok]")){buyAccept(el.dataset.buyok);return}
