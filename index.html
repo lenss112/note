@@ -494,6 +494,14 @@ h2 .ic.hic{width:22px;height:22px;vertical-align:-4px}
 .clklist .r .tm{font-variant-numeric:tabular-nums;color:var(--soft);font-size:12.5px;min-width:86px}
 .clklist .r.now{background:var(--rose-weak);border-radius:8px}
 .clklist .empty{text-align:center}
+.tvask{background:var(--rose-weak);border-radius:12px;padding:10px 12px;margin:10px 0 0}
+.tvask .q{font-size:13.5px;margin-bottom:8px}
+.tvask .b{display:flex;flex-wrap:wrap;gap:6px}
+.tvask .b button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 11px;font-size:13px}
+.clksum{text-align:center;font-size:13px;color:var(--ink);margin-top:8px}
+.clklist .r.tv{color:var(--soft);font-size:12.5px;padding:5px 4px}
+.tvedit{border:0;background:var(--rose-weak);border-radius:999px;padding:2px 8px;font-size:11.5px;color:var(--soft);margin-left:4px}
+.tvbadge{background:#FFA9C9;color:#1F1A1C;border-radius:999px;padding:1px 8px;font-size:11.5px}
 </style>
 </head>
 <body>
@@ -572,7 +580,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const fmtDate=s=>{const d=parse(s);return (d.getMonth()+1)+"/"+d.getDate()+"("+WD[d.getDay()]+")"};
 const hm=ms=>{const d=new Date(ms);return pad(d.getHours())+":"+pad(d.getMinutes())};
 
-let S={events:[],todos:[],notes:[],habits:[],shop:[]};
+let S={events:[],todos:[],notes:[],habits:[],shop:[],travel:[]};
 const SUPP_SEED=[{id:"s1",time:"아침 공복",name:"유산균"},{id:"s2",time:"점심 식후",name:"오메가3"},{id:"s3",time:"점심 식후",name:"비타민 D3"},{id:"s4",time:"점심 식후",name:"비타민 C"},{id:"s5",time:"저녁~취침 전",name:"마그네슘"}];
 let SUPPS=lsGet("supps")||SUPP_SEED;
 const SITE_DEF={title:"姫の手帳",footer:"업무 · 개인 · 취미",suppTitle:"영양제"};
@@ -584,6 +592,7 @@ let V={homeSel:null,tab:"today",filter:"all",month:today().slice(0,7),sel:today(
 function lsGet(k){try{const v=localStorage.getItem("hub:"+k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsSet(k,v){try{localStorage.setItem("hub:"+k,JSON.stringify(v))}catch(e){}}
 KEYS.forEach(k=>{const v=lsGet(k);if(Array.isArray(v))S[k]=v});
+{const v=lsGet("travel");if(Array.isArray(v))S.travel=v}
 const DEFAULT_API="https://script.google.com/macros/s/AKfycbxtTdawaxliNGjGsWff5wkrBUe06PKgvc0pWE6Lb0xp0AICYhVxYF-3UCMPXN7Dy-l42w/exec";
 const DEFAULT_TOKEN="bd60aa459eae43969a372cdc"; // 공개 토큰: 어느 기기에서 열어도 자동 연결
 const CFG={url:lsGet("api")||DEFAULT_API,token:lsGet("token")||DEFAULT_TOKEN};
@@ -665,6 +674,7 @@ async function loadAll(opts={}){
       KEYS.forEach(k=>{S[k]=Array.isArray(d[k])?d[k]:[];lsSet(k,S[k]);last[k]=snap(S[k])});
     }
     if(Array.isArray(d.supps)){SUPPS=d.supps;lsSet("supps",SUPPS)}
+    if(Array.isArray(d.travel)){const loc=S.travel.filter(x=>!d.travel.some(y=>y.id===x.id));S.travel=d.travel.concat(loc);lsSet("travel",S.travel);last.travel=snap(d.travel);if(loc.length)save("travel")}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
     NET.done++;render();migrate();migrateOneCat();pullInbox();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
@@ -843,7 +853,7 @@ function todoRow(t,inGroup){
     else due=`<span>${fmtDate(t.due)}까지</span>`;}
   return `<div class="row ${t.done?"done":""}${inGroup===true?" step":""}" data-tid="${t.id}" ${t.done?"":'draggable="true"'}><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
     <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t,inGroup===true)}</div>
-    <div class="sub">${due}</div></div></div>`;
+    <div class="sub">${due}${t.done?"":`<span>⏱ ${minTxt(estMins(t))}</span>`}</div></div></div>`;
 }
 const list=(rows,emptyMsg,addType)=>`<div class="list">${rows.length?rows.join(""):`<div class="empty">${kit("k_sleep")}${emptyMsg} ${addType?`<button data-add="${addType}">추가하기</button>`:""}</div>`}</div>`;
 function doneFold(arr,rowFn){ // 완료된 할일은 접고 개수만
@@ -867,7 +877,7 @@ function duoTd(t){
   const dd=t.due?diffDays(today(),t.due):0;
   return `<div class="drow ${t.done?"done":""}" data-tid="${t.id}" ${t.done?"":'draggable="true"'}><button class="check ${t.done?"on":""}" data-toggle="${t.id}" aria-label="${t.done?"완료 취소":"완료"}"></button>
     <div class="body" data-edit="todo" data-id="${t.id}"><div class="t">${t.important?'<i class="ic i-star star-ic" role="img" aria-label="중요"></i> ':""}${tText(t)}</div>
-    ${dd>0?`<div class="dt late">${ic("bang")}${dd}일 지남</div>`:""}</div></div>`;
+    ${t.done?"":`<div class="dt">⏱ ${minTxt(estMins(t))}</div>`}</div></div>`;
 }
 function banner(){
   if(!CFG.url)return `<div class="banner">지금은 이 기기에만 저장돼요. 스프레드시트를 연결하면 모든 기기에서 같이 쓸 수 있어요. <button data-tab="settings">연결하기</button></div>`;
@@ -930,7 +940,7 @@ function recPick(){
   const scored=pool.map(t=>{
     const age=Math.max(0,Math.floor((Date.now()-tCreated(t))/86400000));
     let sc=Math.min(age,30),why=[];const si=stepInfo(t);
-    if(si)why.push(si.n+"/"+si.total+"단계");
+    why.push("⏱ "+minTxt(estMins(t)));if(si)why.push(si.n+"/"+si.total+"단계");
     if(t.important){sc+=50;why.push("중요")}
     if(/빠른|급|asap|얼른|빨리/i.test(t.title)){sc+=25;why.push("빨리 하기로 함")}
     if(age>=7)why.push(age+"일째 대기");
@@ -1000,6 +1010,10 @@ async function pullInbox(){
     const r=await fetch("./inbox.json?v="+Date.now(),{cache:"no-store"});if(!r.ok)return;
     const j=await r.json(),seen=lsGet("inbox:seen")||[];let ch=false;
     if(Array.isArray(j.shopRec))lsSet("shoprec",j.shopRec);
+    if(j.mins&&typeof j.mins==="object"){lsSet("tmins",j.mins);render()}
+    let tch=false;(j.travel||[]).forEach(x=>{const id=String(x.title||"").replace(/\s+/g," ").trim();if(!id)return;const k="tv:"+id+":"+x.before;if(seen.includes(k))return;seen.push(k);
+      const o=S.travel.find(y=>y.id===id),b=+x.before||0,a=x.after!=null?+x.after:b;if(o){o.before=b;o.after=a}else S.travel.push({id,title:id,before:b,after:a});tch=true});
+    if(tch){save("travel");render()}
     (j.removeShop||[]).forEach(id=>{const k="rms:"+id;if(seen.includes(k))return;seen.push(k);
       const n=S.shop.length;S.shop=S.shop.filter(x=>x.id!==id);if(S.shop.length!==n)save("shop"),render()});
     (j.remove||[]).forEach(id=>{const k="rm:"+id;if(seen.includes(k))return;seen.push(k);
@@ -1013,6 +1027,42 @@ async function pullInbox(){
     lsSet("inbox:seen",seen.slice(-300));
     if(ch){save("todos");render()}
   }catch(e){}
+}
+/* ---------- 그날 안 한 할일은 다음 날 언젠가로 되돌리기 ---------- */
+function rollOver(){
+  const td=today();let ch=false;
+  S.todos.forEach(t=>{if(!t.done&&t.due&&t.due<td){t.due="";ch=true}});
+  if(ch)save("todos");
+}
+/* ---------- 할일 걸리는 시간 (Claude가 inbox.json의 mins로 정해줌, 없으면 제목 보고 짐작) ---------- */
+function estMins(t){
+  const m=(lsGet("tmins")||{})[t.id];if(m)return +m;
+  const ti=String(t.title||"");
+  if(/연습|안무|편집|보정|촬영|녹음|공부|강의/.test(ti))return 60;
+  if(/청소|정리|빨래|싸기|준비|입어보기|업로드|모으기/.test(ti))return 30;
+  if(/사기|비교|고르기|쓰기/.test(ti))return 20;
+  if(/연락|전화|신청|주문|등록|확인|예약|해제|설정|저장|메모/.test(ti))return 10;
+  return 30;
+}
+const minTxt=n=>n>=60?(Math.floor(n/60)+"시간"+(n%60?" "+n%60+"분":"")):n+"분";
+const sumMins=a=>a.reduce((x,t)=>x+estMins(t),0);
+/* ---------- 이동시간: 어딘가 가는 일정이면 물어보고 앞뒤로 붙이기 ---------- */
+const tvKey=e=>String(e.title||"").replace(/\s+/g," ").trim();
+const tvOf=e=>S.travel.find(x=>x.id===tvKey(e));
+function looksMove(e){
+  const ti=String(e.title||"");
+  if(/온라인|줌|zoom|화상|전화|통화|재택|집에서/i.test(ti+" "+(e.note||"")))return false;
+  if(String(e.note||"").trim())return true;               // 장소가 적혀 있으면 이동
+  return /수업|학원|발레|병원|치과|피부과|한의원|약속|만남|미팅|모임|카페|식사|저녁|점심|브런치|여행|공항|출장|촬영|면접|은행|미용실|네일|공연|콘서트|전시|영화|결혼식|돌잔치|방문|센터|가기|헬스|필라테스|요가|PT|쇼핑|마트|역\b|@/i.test(ti);
+}
+function setTravel(e,min){
+  const id=tvKey(e),o=S.travel.find(x=>x.id===id);
+  if(o){o.before=min;o.after=min}else S.travel.push({id,title:id,before:min,after:min});
+  save("travel");render();
+}
+function travelAsk(ds){ // 아직 이동시간 안 정한, 이동하는 것 같은 일정
+  const seen=new Set();
+  return allEvents().filter(e=>e.date===ds&&e.time&&e.cat!=="hol"&&looksMove(e)&&!tvOf(e)).filter(e=>{const k=tvKey(e);if(seen.has(k))return false;seen.add(k);return true});
 }
 /* ---------- 동그란 하루 계획표 (0~24시, 생활계획표처럼) ---------- */
 const PLAN={sleep:[23,7],work:[9,18]};            // 목표: 23시~7시 잠, 9시~18시 일 (평일만)
@@ -1031,8 +1081,9 @@ function planBlocks(ds){
 function dayTimed(ds){
   const ev=allEvents().filter(e=>e.date===ds&&e.time&&e.cat!=="hol").map(e=>{
     const s=hmOf(e.time);let en=hmOf(e.end);if(en==null||en<=s)en=Math.min(1440,s+60);
-    return{e,s,en,guess:hmOf(e.end)==null}}).filter(x=>x.s!=null).sort((a,b)=>a.s-b.s||b.en-a.en);
-  const lanes=[];ev.forEach(x=>{let i=lanes.findIndex(end=>end<=x.s);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=x.en;x.lane=i});
+    const tv=looksMove(e)?tvOf(e):null,tb=tv?+tv.before||0:0,ta=tv?+tv.after||0:0;
+    return{e,s,en,guess:hmOf(e.end)==null,tb,ta,ts:Math.max(0,s-tb),te:Math.min(1440,en+ta)}}).filter(x=>x.s!=null).sort((a,b)=>a.ts-b.ts||b.te-a.te);
+  const lanes=[];ev.forEach(x=>{let i=lanes.findIndex(end=>end<=x.ts);if(i<0){i=lanes.length;lanes.push(0)}lanes[i]=x.te;x.lane=i});
   return{ev,n:Math.max(1,lanes.length)};
 }
 function clockSvg(ds){
@@ -1058,6 +1109,8 @@ function clockSvg(ds){
   // 일정 링
   const{ev,n}=dayTimed(ds),R1=122,R2=155,w=(R2-R1)/n;
   ev.forEach(x=>{const r1=R1+x.lane*w,r2=r1+w-1;
+    if(x.tb)o+=sect(r1,r2,x.ts,x.s,"#FFA9C9",`stroke="#fff" stroke-width="1"`);
+    if(x.ta)o+=sect(r1,r2,x.en,x.te,"#FFA9C9",`stroke="#fff" stroke-width="1"`);
     o+=sect(r1,r2,x.s,Math.max(x.en,x.s+10),"#1F1A1C",`stroke="#fff" stroke-width="1"`);
     const dur=x.en-x.s;if(n===1&&dur>=45){const[cx,cy]=P((R1+R2)/2,(x.s+x.en)/2);
       const k=Math.max(2,Math.min(8,Math.floor(dur/60*2.2))),t=[...String(x.e.title)];
@@ -1081,14 +1134,18 @@ function clockView(){
   const nm=(d=>d.getHours()*60+d.getMinutes())(new Date()),isT=ds===today();
   const inSleep=ev.filter(x=>blocks.some(b=>b.k==="sleep"&&x.s<b.e&&x.en>b.s));
   const sum=k=>blocks.filter(b=>b.k===k).reduce((a,b)=>a+b.e-b.s,0)/60;
+  const askTv=travelAsk(ds),tdOpen=S.todos.filter(t=>!t.done&&t.due===ds),tdMin=sumMins(tdOpen);
+  let freeLeft=null;if(isT){freeLeft=0;blocks.filter(b=>b.k==="free").forEach(b=>{for(let m=Math.max(b.s,nm);m<b.e;m+=5){if(!ev.some(x=>m>=x.ts&&m<x.te))freeLeft+=5}})}
   return `<section class="clk">
     <div class="clkhead"><b>${fmtDate(ds)}</b>
       <button class="iconbtn" data-cday="-1" aria-label="전날">‹</button><button class="textbtn" data-cday="0">오늘</button><button class="iconbtn" data-cday="1" aria-label="다음날">›</button></div>
     ${allday.length?`<div class="clkallday">${allday.map(e=>`<span>${e.cat==="hol"?"🌸 ":""}${esc(e.title)}</span>`).join("")}</div>`:""}
     <div class="clkwrap">${clockSvg(ds)}</div>
-    <div class="clkleg"><span><i style="background:#E6E0F7"></i>잠 ${sum("sleep")}시간</span>${sum("work")?`<span><i style="background:#FFD3E3"></i>일 ${sum("work")}시간</span>`:""}<span><i style="background:#fff"></i>자유 ${sum("free")}시간</span><span><i style="background:#1F1A1C;border-color:#1F1A1C"></i>일정</span></div>
+    <div class="clkleg"><span><i style="background:#E6E0F7"></i>잠 ${sum("sleep")}시간</span>${sum("work")?`<span><i style="background:#FFD3E3"></i>일 ${sum("work")}시간</span>`:""}<span><i style="background:#fff"></i>자유 ${sum("free")}시간</span><span><i style="background:#1F1A1C;border-color:#1F1A1C"></i>일정</span><span><i style="background:#FFA9C9;border-color:#FFA9C9"></i>이동</span></div>
+    ${askTv.map(e=>`<div class="tvask"><div class="q">🚃 <b>${esc(e.title)}</b> ${esc(e.time)} — 가는 데 얼마나 걸려요?</div><div class="b">${[10,20,30,45,60,90].map(n=>`<button data-tv="${n}" data-tvk="${esc(tvKey(e))}">${minTxt(n)}</button>`).join("")}<button data-tv="?" data-tvk="${esc(tvKey(e))}">직접</button><button data-tv="0" data-tvk="${esc(tvKey(e))}">이동 없음</button></div></div>`).join("")}
+    ${tdMin?`<div class="clksum">오늘 할일 ${tdOpen.length}개 · 약 ${minTxt(tdMin)} 걸려요${freeLeft!=null?` · 남은 자유 시간 ${minTxt(freeLeft)}`:""}</div>`:""}
     ${inSleep.length?`<div class="clkwarn">🌙 잘 시간에 걸친 일정이 ${inSleep.length}개 있어요</div>`:""}
-    <div class="clklist">${ev.length?ev.map(x=>`<div class="r${isT&&nm>=x.s&&nm<x.en?" now":""}"><span class="tm">${hmTxt(x.s)}~${x.guess?"":hmTxt(x.en)}</span><span>${ic(stickerOf(x.e),"stk")}${esc(x.e.title)}</span></div>`).join(""):`<div class="empty">시간이 정해진 일정이 없어요</div>`}</div>
+    <div class="clklist">${ev.length?ev.map(x=>`${x.tb?`<div class="r tv"><span class="tm">${hmTxt(x.ts)}~${hmTxt(x.s)}</span><span>🚃 이동</span></div>`:""}<div class="r${isT&&nm>=x.s&&nm<x.en?" now":""}"><span class="tm">${hmTxt(x.s)}~${hmTxt(x.en)}</span><span>${ic(stickerOf(x.e),"stk")}${esc(x.e.title)}${looksMove(x.e)&&tvOf(x.e)?` <button class="tvedit" data-tvreset="${esc(tvKey(x.e))}">이동 ${minTxt(+tvOf(x.e).before||0)} ✎</button>`:""}</span></div>${x.ta?`<div class="r tv"><span class="tm">${hmTxt(x.en)}~${hmTxt(x.te)}</span><span>🚃 돌아오기</span></div>`:""}`).join(""):`<div class="empty">시간이 정해진 일정이 없어요</div>`}</div>
   </section>`;
 }
 function vToday(){
@@ -1102,13 +1159,13 @@ function vToday(){
   const pinned=S.notes.filter(n=>n.pinned);
   return `${banner()}
   <p class="dateline"><span class="dday">${d.getMonth()+1}/${d.getDate()}(${WD[d.getDay()]})</span><span class="wx" id="wx">${wxHtml()}</span><span class="wxtip" id="wxtip" ${WX?"":"hidden"}>${wxTip()}</span>${kit((h=>h<6||h>=22?"k_sleep":h<11?"k_wink":h<18?"k_bear":"k_shy")(d.getHours()),"kd")}</p>
-  <div class="viewsw"><button data-clock aria-pressed="${!!V.clock}">${V.clock?"📋 목록으로 보기":"🕐 동그란 계획표"}</button></div>
+  <div class="viewsw"><button data-clock aria-pressed="${!!V.clock}">${V.clock?"📋 목록으로 보기":"🕐 동그란 계획표"+(travelAsk(td).length?` <span class="tvbadge">이동시간 ${travelAsk(td).length}개 물어봐요</span>`:"")}</button></div>
   ${V.clock?clockView():`
   ${recBox()}
   <div class="duo home3">
     <section class="col cev"><h3>일정 <small>${evs.length}</small></h3>
       ${evs.length?evs.map(duoEv).join(""):`<div class="dempty">${kit("k_lie")}잡힌 일정 없음<br><button data-add="event">추가</button></div>`}</section>
-    <section class="col ctd"><h3>할일 <small>${todos.filter(t=>!t.done).length}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
+    <section class="col ctd"><h3>할일 <small>${todos.filter(t=>!t.done).length}${todos.some(t=>!t.done)?` · 약 ${minTxt(sumMins(todos.filter(t=>!t.done)))}`:""}</small>${late?` <span class="late">${late}개 밀림</span>`:""}</h3>
       ${todos.some(t=>!t.done)?todos.filter(t=>!t.done).map(duoTd).join(""):`<div class="dempty">${kit(todos.length?"k_hug":"k_sleep")}${todos.length?"오늘 할 일 끝!":"오늘 할 일 없음"}<br><button data-add="todo">추가</button></div>`}${doneFold(todos.filter(t=>t.done),duoTd)}</section>
     <section class="col csh"><h3>살 것 ${ic("bag","hic")}<small>${S.shop.length-shopDone}개 남음</small>${shopDone?`<button class="textbtn" data-shopclear>산 것 지우기</button>`:""}</h3>
       ${shop.length?"":`<div class="dempty">살 것 없음</div>`}${shop.map(x=>`<div class="drow ${x.done?"done":""}"><button class="check ${x.done?"on":""}" data-shop="${x.id}" aria-label="${x.done?"구매 취소":"구매 완료"}"></button>
@@ -1197,7 +1254,7 @@ function vSettings(){
 }
 
 function render(){
-  renderChrome();paintSupp();
+  rollOver();renderChrome();paintSupp();
   const m=document.getElementById("main");
   m.innerHTML={today:vToday,cal:vCal,todo:vTodo,note:vNote,habit:vHabit,settings:vSettings}[V.tab]();
   document.getElementById("fab").classList.toggle("hide",V.tab==="settings");
@@ -1234,6 +1291,11 @@ document.getElementById("main").addEventListener("click",async e=>{
     openSheet(t,S[k].find(x=>x.id===el.dataset.id));return}
   if(el=g("[data-add]")){const inDay=el.closest("#daybox");openSheet(el.dataset.add,null,V.tab==="cal"?{date:V.sel}:inDay?{date:V.homeSel}:{});return}
   if(g("[data-dayclose]")){V.homeSel=null;render();return}
+  if(el=g("[data-tv]")){const k=el.dataset.tvk,e={title:k};let n=el.dataset.tv;
+    if(n==="?"){const v=prompt(k+" — 가는 데 몇 분 걸려요? (숫자만)");if(v==null)return;n=parseInt(v,10);if(!(n>=0))return}
+    setTravel(e,+n);return}
+  if(el=g("[data-tvreset]")){const k=el.dataset.tvreset;const v=prompt(k+" — 가는 데 몇 분 걸려요? (0이면 이동 없음)",String(+(S.travel.find(x=>x.id===k)||{}).before||0));
+    if(v==null)return;const n=parseInt(v,10);if(n>=0)setTravel({title:k},n);return}
   if(g("[data-clock]")){V.clock=!V.clock;if(!V.clock)V.clockDay=null;render();return}
   if(el=g("[data-cday]")){const v=+el.dataset.cday;V.clockDay=v===0?today():addDays(V.clockDay||today(),v);
     if(V.clockDay.slice(0,7)!==V.month){V.month=V.clockDay.slice(0,7);gLoad()}render();return}

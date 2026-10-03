@@ -23,6 +23,7 @@ const SHEETS = {
   notes:  { name: '메모', cols: [['id','id'],['title','제목'],['body','내용'],['cat','분류'],['pinned','고정'],['updated','수정시각']] },
   habits: { name: '루틴', cols: [['id','id'],['name','이름'],['cat','분류'],['log','기록']] },
   shop:   { name: '살것', cols: [['id','id'],['title','품목'],['done','완료'],['created','생성']] },
+  travel: { name: '이동시간', cols: [['id','id'],['title','일정'],['before','가는 시간(분)'],['after','오는 시간(분)']] },
   supps:  { name: '영양제', cols: [['id','id'],['time','시간'],['name','영양제'],['bold','강조'],['note','메모']],
             seed: [['아침 공복','유산균',''],['점심 식후','오메가3',''],['점심 식후','비타민 D3',''],['점심 식후','비타민 C',''],['저녁~취침 전','마그네슘','']] },
 };
