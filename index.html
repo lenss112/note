@@ -1145,6 +1145,9 @@ async function pullInbox(){
       const o=S.notes.find(n=>n.id===x.id);if(o&&!x.replace)return;
       const it={id:x.id,title:x.title||"챙길것",body:x.body||"",cat:"life",pinned:false,updated:Date.now()};if(o)Object.assign(o,it);else S.notes.push(it);nch=true});
     if(nch){save("notes");render()}
+    let hch=false;(j.habits||[]).forEach(x=>{if(!x.id||!x.name)return;const k="hb:"+x.id;if(seen.includes(k))return;seen.push(k);
+      if(S.habits.some(h=>h.id===x.id))return;S.habits.push({id:x.id,name:x.name,cat:x.cat||"life",log:{}});hch=true});
+    if(hch){save("habits");render()}
     lsSet("inbox:seen",seen.slice(-300));
     if(ch){save("todos");render()}
   }catch(e){}
