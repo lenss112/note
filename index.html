@@ -573,12 +573,46 @@ h2 .ic.hic{width:22px;height:22px;vertical-align:-4px}
 .slbar.isT em{color:var(--ink);font-weight:700;font-style:normal}
 .slbar em{font-style:normal}
 .slleg{font-size:12px;color:var(--soft);margin-top:8px}
+.slins{margin-top:12px;background:var(--bg);border-radius:14px;padding:11px 13px;font-size:13.5px}
+.slins p{margin:0;font-family:"Jua",sans-serif;font-size:16px}
+.slins ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;color:var(--ink)}
+.smon{margin-top:14px}
+.smh{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.smh b{font-family:"Jua",sans-serif;font-weight:400;font-size:16px}
+.smh button{border:1px solid var(--line);background:var(--panel);border-radius:999px;width:32px;height:32px;font-size:18px;line-height:1}
+.smh button:disabled{opacity:.35}
+.smh small{margin-left:auto;color:var(--soft);font-size:12.5px}
+.smg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:8px}
+.smw{text-align:center;font-size:11.5px;color:var(--soft)}
+.smc{aspect-ratio:1/1.08;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:3px 2px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;font-size:11px;color:var(--ink);min-width:0;overflow:hidden}
+.smc.e{border:0;background:none}
+.smc:disabled{opacity:.4}
+.smc b{font-weight:500;font-size:11px;color:var(--soft)}
+.smc small{font-family:"Jua",sans-serif;font-size:14px;line-height:1.15}
+.smc i{font-style:normal;font-size:7.5px;letter-spacing:-1px;color:#9A6A00;white-space:nowrap}
+.smc.isT{outline:2px solid var(--ink);outline-offset:-1px}
+.smc.l1,.smleg i.l1{background:repeating-linear-gradient(45deg,#FFE3EE 0 4px,#fff 4px 8px)}
+.smc.l2,.smleg i.l2{background:#EFEAFA}
+.smc.l3,.smleg i.l3{background:#D4CAF0}
+.smc.l4,.smleg i.l4{background:#B3A3E0}
+.smc.l3 b,.smc.l4 b{color:#4A3D80}
+.smleg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:12px;color:var(--soft)}
+.smleg span{display:flex;align-items:center;gap:4px}
+.smleg i{width:12px;height:12px;border-radius:4px;border:1px solid var(--line);display:inline-block}
+.sl-lab{margin-top:12px;font-size:13px;color:var(--soft)}
+.sl-lab small{font-size:11.5px;margin-left:4px}
+.sl-stars{display:flex;gap:4px;justify-content:center;margin-top:4px}
+.sl-stars button{border:0;background:none;font-size:30px;line-height:1;padding:2px 4px;color:var(--line)}
+.sl-stars button.on{color:#F2B705}
+.sl-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.sl-tags button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 11px;font-size:13.5px;color:var(--ink)}
+.sl-tags button.on{background:var(--rose-weak);border-color:var(--pink)}
 .crhist{margin-top:10px;font-size:13px;color:var(--soft)}
 .crhist b{color:var(--ink);font-weight:500}
 
 .sl-scrim{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(120,30,70,.28)}
 .sl-scrim.open{display:flex}
-.sl-card{width:min(360px,100%);background:var(--panel);border-radius:22px;border:2px solid var(--rose-weak);padding:18px;box-shadow:0 6px 0 var(--rose-weak)}
+.sl-card{max-height:calc(100dvh - 40px);overflow-y:auto;width:min(380px,100%);background:var(--panel);border-radius:22px;border:2px solid var(--rose-weak);padding:18px;box-shadow:0 6px 0 var(--rose-weak)}
 .sl-top{display:flex;align-items:center;justify-content:space-between}
 .sl-top h3{margin:0;font-family:"Jua",sans-serif;font-weight:400;font-size:19px}
 .sl-row{display:flex;align-items:flex-end;gap:8px;margin-top:14px}
@@ -1907,7 +1941,7 @@ function render(){
 
 /* ---------- 😴 수면 기록 · 🌿 컨디션 루틴 ----------
    기록은 메모 탭에 id가 sys-로 시작하는 줄로 저장돼요 (메모 목록에는 안 보여요). 시트에서 직접 고쳐도 돼요.
-   sys-sleep : 한 줄에 하루  "2026-10-10 | 23:40 → 07:10 | 7시간 30분"  (날짜 = 일어난 날)
+   sys-sleep : 한 줄에 하루  "2026-10-10 | 23:40 → 07:10 | 7시간 30분 | ★4 | 폰, 카페인"  (날짜 = 일어난 날, ★ 잠의 질 1~5, 끝 칸 = 자기 전 한 일)
    sys-cond  : 한 줄에 한 번 "2026-10-10 08:12 | 아침 몸 깨우기 | 11/11 | 기운3 기분4" */
 const SLEEP_ID="sys-sleep",COND_ID="sys-cond";
 const isSys=n=>isPack(n)||String((n&&n.id)||"").startsWith("sys-");
@@ -1915,9 +1949,14 @@ function sysNote(id,title){let n=S.notes.find(x=>x.id===id);if(!n){n={id,title,b
 const sysLines=id=>String(S.notes.find(x=>x.id===id)?.body||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
 const durMin=(a,b)=>{const x=hmOf(a),y=hmOf(b);if(x==null||y==null)return 0;let d=y-x;if(d<=0)d+=1440;return d};
 function sleepLog(){const m={};sysLines(SLEEP_ID).forEach(l=>{const r=/^(\d{4}-\d{2}-\d{2})\D+?(\d{1,2}:\d{2})\s*(?:→|~|-|>)\s*(\d{1,2}:\d{2})/.exec(l);
-  if(r)m[r[1]]={bed:r[2].padStart(5,"0"),wake:r[3].padStart(5,"0"),min:durMin(r[2],r[3])}});return m}
+  if(!r)return;const seg=l.split("|").slice(3).map(x=>x.trim()).filter(Boolean),qs=seg.find(x=>/★\s*\d/.test(x)),q=qs?+/★\s*(\d)/.exec(qs)[1]:0;
+  const tg=seg.filter(x=>x!==qs).join(",").split(/[,，·]/).map(x=>x.trim()).filter(Boolean);
+  m[r[1]]={bed:r[2].padStart(5,"0"),wake:r[3].padStart(5,"0"),min:durMin(r[2],r[3]),q:Math.min(5,q),tags:tg}});return m}
+const SL_TAGS=[["폰","📱"],["카페인","☕"],["술","🍺"],["야식","🍜"],["스트레스","😣"],["운동","🏃"],["샤워","🛁"],["스트레칭","🧘"]];
+const slTagIco=t=>(SL_TAGS.find(x=>x[0]===t)||[0,"·"])[1];
+const STARS=n=>n?"★".repeat(n)+"☆".repeat(5-n):"";
 function sleepWrite(fn){const n=sysNote(SLEEP_ID,"수면 기록");n.body=fn(String(n.body||"").split(/\r?\n/).filter(l=>l.trim())).sort().slice(-400).join("\n");n.updated=Date.now();save("notes")}
-function sleepSet(d,bed,wake){sleepWrite(ls=>ls.filter(l=>!l.trim().startsWith(d)).concat(`${d} | ${bed} → ${wake} | ${minTxt(durMin(bed,wake))}`));afterSleep()}
+function sleepSet(d,bed,wake,q,tags){sleepWrite(ls=>ls.filter(l=>!l.trim().startsWith(d)).concat(`${d} | ${bed} → ${wake} | ${minTxt(durMin(bed,wake))}${q?` | ★${q}`:""}${tags&&tags.length?` | ${tags.join(", ")}`:""}`));afterSleep()}
 function sleepDel(d){sleepWrite(ls=>ls.filter(l=>!l.trim().startsWith(d)));afterSleep()}
 function afterSleep(){render();if(condOpen&&!crRun)crApplySleep(),crRenderCheck()}
 const sleepWord=m=>m<300?"많이 부족해요":m<360?"조금 부족해요":m<420?"그럭저럭":m<=570?"잘 잤어요 🎀":"푹 잤어요";
@@ -1925,7 +1964,7 @@ const sleepWord=m=>m<300?"많이 부족해요":m<360?"조금 부족해요":m<420
 /* 홈 화면 한 줄 */
 function condBox(){
   const td=today(),t=sleepLog()[td],done=condLog().filter(x=>x.date===td);
-  return `<div class="cbox"><div class="sl">${t?`<button class="sltoday" data-sleep="${td}" aria-label="오늘 수면 기록 고치기">😴 어젯밤 <b>${minTxt(t.min)}</b><small>${t.bed}→${t.wake} · ${sleepWord(t.min)}</small></button>`
+  return `<div class="cbox"><div class="sl">${t?`<button class="sltoday" data-sleep="${td}" aria-label="오늘 수면 기록 고치기">😴 어젯밤 <b>${minTxt(t.min)}</b><small>${t.bed}→${t.wake} · ${t.q?STARS(t.q):sleepWord(t.min)}</small></button>`
     :`<button class="slask" data-sleep="${td}">😴 어젯밤 몇 시간 잤어요?</button>`}
     ${done.length?`<span class="cdone">오늘 한 루틴 · ${done.map(x=>esc(x.name)).join(", ")}</span>`:""}</div>
     <button class="cgo" data-cond>🌿 컨디션 루틴</button></div>`;
@@ -1939,13 +1978,58 @@ function sleepCard(){
    <div class="slbars">${days.map((d,i)=>`<button class="slbar ${d===td?"isT":""} ${v[i]&&v[i]<360?"low":""}" data-sleep="${d}" aria-label="${fmtDate(d)} ${v[i]?minTxt(v[i]):"기록 없음"}, 눌러서 기록">
      <span class="col"><i style="height:${v[i]?Math.max(4,Math.min(100,v[i]/6)):0}%"></i></span><b>${v[i]?(v[i]/60).toFixed(1).replace(/\.0$/,""):"–"}</b><em>${d===td?"오늘":WD[parse(d).getDay()]}</em></button>`).join("")}</div>
    <div class="slleg">막대를 누르면 그날 기록을 넣거나 고칠 수 있어요 · 점선은 8시간</div>
+   ${(ins=>`<div class="slins"><p>${esc(ins.main)}</p>${ins.tips.length?`<ul>${ins.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}</div>`)(sleepInsight(L))}
+   ${sleepMonth(L)}
    ${hist.length?`<div class="crhist">최근 컨디션 루틴 · ${hist.map(x=>`<b>${esc(x.name)}</b> ${fmtDate(x.date)}`).join(" · ")}</div>`:""}</div>`;
 }
 
+/* ---------- 수면 분석: 한 줄 코멘트 ---------- */
+const bedRel=t=>{const b=hmOf(t);return b==null?null:b<720?b+1440:b};   // 정오 기준으로 펴서 자정 넘김도 계산
+const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+function sleepInsight(L){
+  const td=today(),wk=[...Array(7)].map((_,i)=>addDays(td,i-6)),pw=[...Array(7)].map((_,i)=>addDays(td,i-13));
+  const cur=wk.map(d=>L[d]).filter(Boolean),prev=pw.map(d=>L[d]).filter(Boolean);
+  if(!cur.length)return {main:"이번 주 기록이 아직 없어요. 아침에 일어나서 한 번만 눌러 주세요 🌙",tips:[]};
+  const avg=mean(cur.map(x=>x.min)),beds=cur.map(x=>bedRel(x.bed)),ontime=beds.filter(b=>b<=1410).length;
+  const sd=Math.sqrt(mean(beds.map(b=>(b-mean(beds))**2))),qa=cur.filter(x=>x.q).map(x=>x.q);
+  let main=`이번 주 평균 ${minTxt(Math.round(avg))} · ${sleepWord(avg)}`;
+  if(prev.length>=3){const d=Math.round(avg-mean(prev.map(x=>x.min)));if(Math.abs(d)>=15)main+=d>0?` (지난주보다 ${minTxt(d)} 더)`:` (지난주보다 ${minTxt(-d)} 덜)`}
+  const tips=[];
+  tips.push(`🌙 23시 반 전에 잠든 날 ${ontime}/${cur.length}일 · 평균 ${hmTxt(Math.round(mean(beds))%1440)}에 잠들었어요`);
+  if(cur.length>=4)tips.push(sd<=30?"⏰ 잠드는 시간이 일정해요. 아주 좋아요!":sd<=60?"⏰ 잠드는 시간이 1시간 안쪽으로 왔다 갔다 해요":"⏰ 잠드는 시간이 들쭉날쭉해요. 같은 시간에 눕는 것부터 해 봐요");
+  if(qa.length)tips.push(`⭐ 잠의 질 평균 ${mean(qa).toFixed(1)} / 5`);
+  /* 자기 전 행동 효과: 최근 30일, 한 날·안 한 날 각 2번 이상일 때만 */
+  const m30=[...Array(30)].map((_,i)=>L[addDays(td,-i)]).filter(Boolean),fx=[];
+  SL_TAGS.forEach(([t,ic])=>{const y=m30.filter(x=>x.tags.includes(t)),n=m30.filter(x=>!x.tags.includes(t));if(y.length<2||n.length<2)return;
+    const yq=y.filter(x=>x.q).map(x=>x.q),nq=n.filter(x=>x.q).map(x=>x.q),dq=yq.length>=2&&nq.length>=2?mean(yq)-mean(nq):0,dm=mean(y.map(x=>x.min))-mean(n.map(x=>x.min));
+    fx.push({t,ic,dq,dm,score:dq+dm/60})});
+  const bad=fx.filter(f=>f.dq<=-0.5||f.dm<=-30).sort((a,b)=>a.score-b.score)[0],good=fx.filter(f=>f.dq>=0.5||f.dm>=30).sort((a,b)=>b.score-a.score)[0];
+  const fxTxt=f=>[Math.abs(f.dq)>=0.5?`잠의 질 ${f.dq>0?"+":""}${f.dq.toFixed(1)}`:"",Math.abs(f.dm)>=30?`잔 시간 ${f.dm>0?"+":"−"}${minTxt(Math.round(Math.abs(f.dm)))}`:""].filter(Boolean).join(", ");
+  if(bad)tips.push(`${bad.ic} '${bad.t}' 한 날: ${fxTxt(bad)}. 줄여 보면 좋겠어요`);
+  if(good)tips.push(`${good.ic} '${good.t}' 한 날: ${fxTxt(good)}! 계속해요 🎀`);
+  if(!bad&&!good&&m30.length<8)tips.push("📊 자기 전 행동을 2주쯤 기록하면 무엇이 잠에 영향을 주는지 알려 드릴게요");
+  return {main,tips};
+}
+/* 월간 달력: 잔 시간으로 색칠 */
+let slMon=null;
+const slLv=m=>!m?"":m<360?"l1":m<420?"l2":m<=570?"l3":"l4";
+function sleepMonth(L){
+  const td=today();slMon=slMon||td.slice(0,7);const[y,mo]=slMon.split("-").map(Number),first=new Date(y,mo-1,1),last=new Date(y,mo,0).getDate();
+  const ds=[...Array(last)].map((_,i)=>`${slMon}-${pad(i+1)}`),rec=ds.map(d=>L[d]).filter(Boolean);
+  const cells=[...Array(first.getDay())].map(()=>`<span class="smc e"></span>`).concat(ds.map(d=>{const x=L[d],fut=d>td;
+    return `<button class="smc ${slLv(x?.min)} ${d===td?"isT":""}" ${fut?"disabled":`data-sleep="${d}"`} aria-label="${fmtDate(d)} ${x?minTxt(x.min)+(x.q?", 별 "+x.q+"개":""):"기록 없음"}"><b>${+d.slice(8)}</b>${x?`<small>${(x.min/60).toFixed(1).replace(/\.0$/,"")}</small>${x.q?`<i>${"★".repeat(x.q)}</i>`:""}`:""}</button>`}));
+  return `<div class="smon"><div class="smh"><button data-slmon="-1" aria-label="이전 달">‹</button><b>${y}년 ${mo}월</b><button data-slmon="1" aria-label="다음 달" ${slMon>=td.slice(0,7)?"disabled":""}>›</button>
+    <small>${rec.length}일 기록${rec.length?" · 평균 "+minTxt(Math.round(mean(rec.map(x=>x.min)))):""}</small></div>
+    <div class="smg">${WD.map(w=>`<span class="smw">${w}</span>`).join("")}${cells.join("")}</div>
+    <div class="smleg"><span><i class="l1"></i>6시간↓</span><span><i class="l2"></i>6~7</span><span><i class="l3"></i>7~9.5</span><span><i class="l4"></i>9.5↑</span><span>★ 잠의 질</span></div></div>`;
+}
+
 /* 수면 입력 창 */
-let slDate=null;
+let slDate=null,slQ=0,slTags=new Set();
+const slStarsHtml=()=>[1,2,3,4,5].map(n=>`<button class="${n<=slQ?"on":""}" data-slq="${n}" aria-label="별 ${n}개" aria-pressed="${n<=slQ}">★</button>`).join("");
+const slTagsHtml=()=>SL_TAGS.map(([t,ic])=>`<button class="${slTags.has(t)?"on":""}" data-sltag="${esc(t)}" aria-pressed="${slTags.has(t)}">${ic} ${esc(t)}</button>`).join("");
 function openSleep(d){
-  slDate=d||today();const L=sleepLog(),cur=L[slDate],ks=Object.keys(L).sort(),last=ks.length?L[ks[ks.length-1]]:null;
+  slDate=d||today();const L=sleepLog(),cur=L[slDate];slQ=cur?.q||0;slTags=new Set(cur?.tags||[]);const _c=cur,ks=Object.keys(L).sort(),last=ks.length?L[ks[ks.length-1]]:null;
   const now=new Date(),nm=now.getHours()*60+now.getMinutes();
   const wake=cur?.wake||(slDate===today()&&nm>=240&&nm<=780?hmTxt(Math.floor(nm/5)*5):last?.wake||"07:00");
   const bed=cur?.bed||last?.bed||"23:30";
@@ -1954,6 +2038,8 @@ function openSleep(d){
     <div class="sl-top"><h2 id="slT">😴 ${slDate===today()?"어젯밤":fmtDate(slDate)+" 아침까지"} 잠</h2><button class="sclose" data-slclose aria-label="닫기">×</button></div>
     <div class="sl-row"><label>잠든 시간<input type="time" id="slBed" value="${bed}"></label><span aria-hidden="true">→</span><label>일어난 시간<input type="time" id="slWake" value="${wake}"></label></div>
     <p class="sl-sum" id="slSum"></p>
+    <div class="sl-lab">잠의 질</div><div class="sl-stars" id="slStars">${slStarsHtml()}</div>
+    <div class="sl-lab">자기 전에 한 것 <small>여러 개 골라도 돼요</small></div><div class="sl-tags" id="slTags">${slTagsHtml()}</div>
     <div class="sl-btns">${cur?`<button data-sldel>기록 지우기</button>`:""}<button class="pri" data-slsave>저장</button></div></div>`;
   el.classList.add("open");slSum();setTimeout(()=>document.getElementById("slBed")?.focus(),50);
 }
@@ -2186,7 +2272,10 @@ document.addEventListener("click",e=>{
   if(g("[data-cond]")){openCond();return}
   if(el=g("[data-sleep]")){openMenu(false);openSleep(el.dataset.sleep);return}
   if(g("[data-slclose]")||e.target.id==="sleepdlg"){closeSleep();return}
-  if(g("[data-slsave]")){const b=$c("slBed").value,w=$c("slWake").value;if(!durMin(b,w))return;closeSleep();sleepSet(slDate,b,w);return}
+  if(el=g("[data-slq]")){const n=+el.dataset.slq;slQ=slQ===n?0:n;$c("slStars").innerHTML=slStarsHtml();return}
+  if(el=g("[data-sltag]")){const t=el.dataset.sltag;slTags.has(t)?slTags.delete(t):slTags.add(t);$c("slTags").innerHTML=slTagsHtml();return}
+  if(el=g("[data-slmon]")){const[y,m]=(slMon||today().slice(0,7)).split("-").map(Number),d=new Date(y,m-1+(+el.dataset.slmon),1);slMon=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;render();return}
+  if(g("[data-slsave]")){const b=$c("slBed").value,w=$c("slWake").value;if(!durMin(b,w))return;closeSleep();sleepSet(slDate,b,w,slQ,SL_TAGS.map(x=>x[0]).filter(t=>slTags.has(t)));return}
   if(g("[data-sldel]")){closeSleep();sleepDel(slDate);return}
   if(!condOpen)return;
   if(g("[data-crclose]")){closeCond();return}
