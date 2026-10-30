@@ -1162,6 +1162,7 @@ function renderChrome(){
     +`<button data-pack aria-pressed="${packOpen}" aria-controls="pack"><span class="ico" aria-hidden="true">${ic("suitcase")}</span>챙길 것</button>`
     +`<button data-cond><span class="ico" aria-hidden="true">${ic("clover")}</span>컨디션 루틴</button>`
     +`<button data-sleep="${today()}"><span class="ico" aria-hidden="true">${ic("cloud")}</span>수면 기록</button>`
+    +`<button data-href="./map/"><span class="ico" aria-hidden="true">${ic("plane")}</span>여행·맛집 지도</button>`
     +TABS.slice(1).map(tb).join("")
     +`<div class="sep"></div><button data-tab="settings" ${V.tab==="settings"?'aria-current="page"':""}><span class="ico" aria-hidden="true">${ic("star")}</span>설정</button>`;
   paintSync();
@@ -1174,6 +1175,7 @@ function openMenu(o){
 }
 document.getElementById("burger").onclick=()=>openMenu(!document.body.classList.contains("menu"));
 document.getElementById("dscrim").onclick=()=>openMenu(false);
+document.addEventListener("click",e=>{const b=e.target.closest("[data-href]");if(b){openMenu(false);location.href=b.dataset.href}});
 document.getElementById("sync").onclick=()=>{if(CFG.url)loadAll({force:true});else{V.tab=DEMO?"login":"settings";render()}};
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-tab]");
