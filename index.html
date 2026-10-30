@@ -1470,6 +1470,9 @@ async function pullInbox(){
     let hch=false;(j.habits||[]).forEach(x=>{if(!x.id||!x.name)return;const k="hb:"+x.id;if(seen.includes(k))return;seen.push(k);
       if(S.habits.some(h=>h.id===x.id))return;S.habits.push({id:x.id,name:x.name,cat:x.cat||"life",log:{}});hch=true});
     if(hch){save("habits");render()}
+    /* Claude가 대신 적어 준 수면 기록 {date,bed,wake,q,tags} */
+    (j.sleep||[]).forEach(x=>{if(!x||!/^\d{4}-\d{2}-\d{2}$/.test(x.date||"")||!x.bed||!x.wake)return;const k="sl:"+x.date+":"+x.bed+":"+x.wake+":"+(x.q||0);if(seen.includes(k))return;seen.push(k);
+      sleepSet(x.date,String(x.bed).padStart(5,"0"),String(x.wake).padStart(5,"0"),Math.min(5,+x.q||0),Array.isArray(x.tags)?x.tags:[])});
     lsSet("inbox:seen",seen.slice(-300));
     if(ch){save("todos");render()}
   }catch(e){}
