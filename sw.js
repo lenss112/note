@@ -1,6 +1,6 @@
 // 은지의 하루 — 앱 껍데기를 기기에 저장해서 오프라인에서도 열리게 해요.
 // 데이터(스프레드시트·캘린더) 요청은 건드리지 않아요.
-const VERSION = "hub-v19";
+const VERSION = "hub-v20";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -17,6 +17,9 @@ self.addEventListener("fetch", e => {
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);
   if (url.origin !== location.origin && !isFont) return;   // Apps Script 요청은 그대로 통과
   if (req.mode === "navigate") {
+    // 공주노트 첫 화면만 담당하고, 지도(/map/) 같은 다른 페이지는 그대로 통과
+    const base = new URL("./", self.registration.scope).pathname;
+    if (url.pathname !== base && url.pathname !== base + "index.html") return;
     // 화면: 인터넷이 되면 최신 버전, 안 되면 저장된 버전
     e.respondWith(fetch(req, { cache: "no-store" }).then(r => { const c = r.clone(); caches.open(VERSION).then(x => x.put("./index.html", c)); return r; })
       .catch(() => caches.match("./index.html")));
