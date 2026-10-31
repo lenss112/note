@@ -1048,7 +1048,7 @@ async function loadAll(opts={}){
     if(opts.quiet&&busyUI()){loading=false;NET.state="ok";paintSync();return}
     applyLoad(j,opts);
     NET.imported=j.imported||0;
-    NET.done++;render();migrate();migrateOneCat();pullInbox(j);migrateSteps();wipeTodos1();seedIdol1();
+    NET.done++;render();migrate();migrateOneCat();pullInbox(j);migrateSteps();wipeTodos1();seedIdol1();seedIdolAdds();
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
   }catch(e){if(e&&e.code==="unauthorized"){authFail();return}if(!(e&&e.code==="pending")){NET.state="err";NET.msg=errMsg(e)}}
@@ -1263,6 +1263,14 @@ function seedIdol1(){
   if(lsGet("seed:idol1"))return;lsSet("seed:idol1",1);
   if(S.notes.some(n=>n.id===IDOL_MONEY))return;
   sysNote(IDOL_MONEY,"지하돌 가계부").body="2026-10-31 | 트위터 파딱 | 35000 | 계정·SNS";save("notes");paintIdol();
+}
+const IDOL_ADDS=[["idoladd:orifuku-design","2026-10-31 | 오리복 디자인비 | 50000 | 의상·소품"]];
+function seedIdolAdds(){
+  const todo=IDOL_ADDS.filter(([k,l])=>!lsGet(k));if(!todo.length)return;
+  const have=sysLines(IDOL_MONEY).map(x=>x.replace(/\s+/g,""));
+  const lines=todo.filter(([k,l])=>!have.includes(l.replace(/\s+/g,""))).map(([k,l])=>l);
+  todo.forEach(([k])=>lsSet(k,1));
+  if(lines.length)idolWrite(IDOL_MONEY,"지하돌 가계부",ls=>ls.concat(lines));
 }
 function paintIdol(){
   const el=document.getElementById("idol");if(!el)return;
