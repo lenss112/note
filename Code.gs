@@ -3,10 +3,11 @@
  *
  * 하는 일
  *  1) 스프레드시트의 일정·할일·메모·루틴·살것 탭을 사이트와 주고받기
- *  2) 구글 캘린더 일정을 읽어서 사이트 캘린더에 보여주기 (읽기 전용)
- *  3) 구글 드라이브 '허브_인박스' 폴더에 Claude가 넣은 JSON 파일을 스프레드시트로 옮기기
- *  4) 마감일이 있는 할일을 구글 캘린더 '姫の手帳 할일'에 종일 일정으로 자동 등록
- *     (네이버 캘린더는 이 캘린더의 iCal 비공개 주소를 '구독'해서 봐요)
+ *  2) 구글 드라이브 '허브_인박스' 폴더에 Claude가 넣은 JSON 파일을 스프레드시트로 옮기기
+ *
+ *  2026-10-31 속도 개선: 구글 캘린더 연동(읽기·할일 등록)을 뺐어요. 공휴일은 사이트에 내장돼 있어요.
+ *   - 불러오기는 잠금 없이 바로 읽고, 인박스·보관 같은 잡일은 10분에 한 번만 해요.
+ *   - 저장하면 최신 내용을 같이 돌려줘서 따로 다시 불러올 필요가 없어요.
  *
  * 사이트의 모든 내용(일정·할일·메모·루틴·살것·영양제·사이트 문구)은 이 스프레드시트에서 고칠 수 있어요.
  *
@@ -63,7 +64,6 @@ function setup() {
     token = Utilities.getUuid().replace(/-/g, '').slice(0, 24);
     props.setProperty('TOKEN', token);
   }
-  const cal = todoCal_();
   const guide = ss.getSheetByName('안내') || ss.insertSheet('안내', 0);
   guide.clear();
   guide.getRange(1, 1, 8, 2).setValues([
@@ -73,8 +73,8 @@ function setup() {
     ['예/아니오 값', 'O 이면 예, 비우면 아니오'],
     ['날짜 형식', '2026-09-30'],
     ['루틴 기록', '체크한 날짜를 쉼표로 구분 (예: 2026-09-21, 2026-09-22)'],
-    ['할일 캘린더', TODO_CAL_NAME + ' (마감일 있는 할일이 자동으로 들어가요)'],
-    ['캘린더id', '할일 탭의 캘린더id 칸은 자동으로 채워져요 — 지우지 마세요'],
+    ['구글 캘린더', '연동하지 않아요 (2026-10-31부터)'],
+    ['캘린더id', '이제 쓰지 않는 칸이에요'],
   ]);
   guide.getRange('A1:A8').setFontWeight('bold');
   guide.setColumnWidth(1, 120);
@@ -82,8 +82,6 @@ function setup() {
   const s1 = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (s1 && s1.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(s1);
   Logger.log('토큰: ' + token);
-  Logger.log('할일 캘린더 id: ' + cal.getId());
-  syncAllTodos_();
 }
 
 /* ---------------- 웹 앱 입구 ---------------- */
@@ -99,38 +97,63 @@ function handle_(p) {
   if (a !== true) return json_({ error: a });
   try {
     if (p.action === 'ping') return json_({ ok: true });
-    if (p.action === 'inbox') return json_({ ok: true, inbox: clientInbox_() });
-    if (p.action === 'gcal') return json_({ ok: true, events: gcal_(p.from, p.to) });
+    if (p.action === 'inbox') return json_({ ok: true, inbox: clientInboxCached_() });
+    if (p.action === 'gcal') return json_({ ok: true, events: [] });       // 캘린더 연동은 뺐어요 (예전 사이트용 빈 답)
 
-    const lock = LockService.getScriptLock();
-    lock.waitLock(20000);
-    try {
-      if (p.action === 'load') {
-        archiveIfDue_();
-        syncIfDue_();
-        const imported = processInbox_();
-        return json_(Object.assign({ ok: true, imported: imported }, loadFast_()));
-      }
-      if (p.action === 'ops') {
+    if (p.action === 'load') {
+      const imported = choresIfDue_();
+      return json_(Object.assign({ ok: true, imported: imported, inbox: clientInboxCached_() }, loadFast_()));
+    }
+    if (p.action === 'ops') {
+      const lock = LockService.getScriptLock();
+      lock.waitLock(20000);
+      try {
         (p.ops || []).forEach(o => {
           if (!SHEETS[o.key]) return;
-          if (o.op === 'upsert' && o.item && o.item.id) {
-            if (o.key === 'todos') saveTodo_(o.item);
-            else upsert_(o.key, o.item);
-          } else if (o.op === 'delete' && o.id) {
-            if (o.key === 'todos') removeTodoEvent_(o.id);
-            delete_(o.key, o.id);
-          }
+          if (o.op === 'upsert' && o.item && o.item.id) upsert_(o.key, o.item);
+          else if (o.op === 'delete' && o.id) delete_(o.key, o.id);
         });
-        return json_({ ok: true });
+        SpreadsheetApp.flush();
+        return json_(Object.assign({ ok: true }, loadFast_()));            // 저장하면서 최신 내용도 같이 돌려줘요
+      } finally {
+        lock.releaseLock();
       }
-    } finally {
-      lock.releaseLock();
     }
     return json_({ error: 'unknown_action' });
   } catch (err) {
     return json_({ error: 'server', message: String((err && err.message) || err) });
   }
+}
+
+/* 인박스 옮기기·오래된 할일 보관은 10분에 한 번만 (불러오기를 느리게 하지 않게) */
+function choresIfDue_() {
+  const cache = CacheService.getScriptCache();
+  if (cache.get('CHORES')) return 0;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return 0;
+  try {
+    cache.put('CHORES', '1', 600);
+    archiveIfDue_();
+    const n = processInbox_();
+    if (n) cache.remove('CLIENT_INBOX');
+    return n;
+  } finally {
+    lock.releaseLock();
+  }
+}
+/* Claude 받은편지함은 5분 동안 기억해 둬요 (드라이브를 매번 열지 않게). 바로 반영하려면 refreshInbox 실행 */
+function clientInboxCached_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('CLIENT_INBOX');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const j = clientInbox_();
+  try { cache.put('CLIENT_INBOX', JSON.stringify(j), 300); } catch (e) {}   // 너무 크면 그냥 매번 읽어요
+  return j;
+}
+function refreshInbox() {
+  const c = CacheService.getScriptCache();
+  c.remove('CLIENT_INBOX'); c.remove('CHORES');
+  Logger.log('받은편지함 새로 읽기: ' + processInbox_() + '개 옮김');
 }
 
 function auth_(t) {
@@ -518,11 +541,7 @@ function todoCal_() {
 }
 
 // 사이트는 캘린더id를 모르니까, 시트에 있던 값을 이어받은 뒤 캘린더를 맞추고 저장해요
-function saveTodo_(item) {
-  const s = sheet_('todos');
-  const row = findRow_(s, item.id);
-  if (!item.gcalId && row) item.gcalId = String(s.getRange(row, SHEETS.todos.cols.length).getDisplayValue() || '');
-  try { syncTodoEvent_(item); } catch (e) { Logger.log('캘린더 연동 실패: ' + e); }
+function saveTodo_(item) {   // 캘린더 등록은 뺐어요 — 시트에만 저장
   upsert_('todos', item);
 }
 
