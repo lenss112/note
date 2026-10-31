@@ -1038,7 +1038,7 @@ async function loadAll(opts={}){
     if(Array.isArray(d.travel)){const loc=S.travel.filter(x=>!d.travel.some(y=>y.id===x.id));S.travel=d.travel.concat(loc);lsSet("travel",S.travel);last.travel=snap(d.travel);if(loc.length)save("travel")}
     if(j.site){SITE={...SITE_DEF,...j.site};lsSet("site",SITE)}
     NET.imported=j.imported||0;
-    NET.done++;render();migrate();migrateOneCat();pullInbox();migrateSteps();          // 시트 내용은 받자마자 먼저 보여줘요
+    NET.done++;render();migrate();migrateOneCat();pullInbox();migrateSteps();wipeTodos1();          // 시트 내용은 받자마자 먼저 보여줘요
     await calP;
     const dur=Date.now()-NET.t0,old=lsGet("loadMs");lsSet("loadMs",Math.round(old?old*0.6+dur*0.4:dur));
     NET.state="ok";NET.msg="";NET.at=Date.now();
@@ -1423,6 +1423,14 @@ function migrate(){
   if(!lsGet("mig:add1")){[["mig1toilet","화장실 하수구 냄새 탈취제 사거나 해결하기",false],["mig1washer","세탁기 고치기 (빠른 시일 내)",true]].forEach(([id,title,imp])=>{
     if(!S.todos.some(t=>t.id===id)){S.todos.push({id,title,cat:"life",due:"",important:imp,done:false,doneAt:null,created:Date.now()});ch=true}});lsSet("mig:add1",1)}
   if(ch){save("todos");render()}
+}
+/* ---------- 한 번만: 2026-10-31 기준 할일 전부 비우기 (그 뒤 새로 넣은 할일은 그대로) ---------- */
+const WIPE1_IDS=new Set(["muex0fo04nh4m", "muex0g3id243y", "muex0ghmutld5", "muex0gx5dy9cp", "muex0hdp2isp9", "muf69dstjkld1", "muf7lnyusupord", "muf9vmdqwash1", "st_mig1washer_1", "st_mig1washer_2", "st_mig1washer_3", "st_mig1washer_4", "st_mig1toilet_1", "st_mig1toilet_2", "st_mig1toilet_3", "st_mig1toilet_4", "st_mupo84mw31e2g_1", "st_mupo84mw31e2g_2", "st_mupo84mw31e2g_3", "st_mumjb5em8mqm2_1", "st_mumjb5em8mqm2_2", "st_mumjb5em8mqm2_3", "st_muex0f838ilv2_1", "st_muex0f838ilv2_2", "st_muex0f838ilv2_3", "st_muex0efx4i62n_1", "st_muex0efx4i62n_2", "st_muex0efx4i62n_3", "st_muewxs7gas1uh_1", "st_muewxs7gas1uh_2", "st_muewxs7gas1uh_3", "st_muewxs7gas1uh_4", "st_muewxsnhjya43_1", "st_muewxsnhjya43_2", "st_muewxsnhjya43_3", "st_muewxr0l868hr_1", "st_muewxr0l868hr_2", "st_muewxr0l868hr_3", "st_muewxrrm44ss8_1", "st_muewxrrm44ss8_2", "st_muewxrrm44ss8_3", "st_muf69e8ll15po_1", "st_muf69e8ll15po_2", "st_muf69e8ll15po_3", "st_mupab9wsiq2z5_1", "st_mupab9wsiq2z5_2", "st_mupab9wsiq2z5_3", "st_mupabauxi3wuh_1", "st_mupabauxi3wuh_2", "st_mupabauxi3wuh_3", "ib20261002pouch", "ib20261002humid", "ib1002t1", "ib1002t2", "ib1002dance", "ib1002t8", "ib1002t9", "musfq2pk0xpet", "musfq3fzuaylo", "musfq4q5l71ad", "musfq4zup5pog", "ib1003silver", "mvstmuraft2kf", "mvstmvl67xef5", "mvstmyl3bqb25", "mvstmyygg2qj5", "mvstmzbnfme3v", "mvstmzqtzlccb", "mvstn04todcm7", "mvstn0isfy4ao", "mvstn0zcl1jbr", "mvstn1cfmj1xi", "mvstn1pzc2d28", "mvstn23a9cmnk", "mvstn2hcdsr2s", "mvstn30zu03sx", "mvstn3hyvkfoi", "mvstn3vcnjqyw", "mvstn48zjc5mz", "mvstn4lsfrvcr", "mvstn52fszds1", "mvstn5fnqefoq", "mvstn5s3cgt7h", "mvstn676b9b2b", "mvstn6jbqs0hh"]);
+function wipeTodos1(){
+  if(lsGet("mig:wipe1"))return;
+  const before=S.todos.length;S.todos=S.todos.filter(t=>!WIPE1_IDS.has(t.id));
+  if(S.todos.length!==before){save("todos");render()}
+  lsSet("mig:wipe1",1);
 }
 /* ---------- 한 번만: 언젠가 할 일을 작은 단계로 쪼개기 (2026-10-02) ---------- */
 const MIG2_AT=1790900000000,MIG2={"mig1washer": ["세탁기 고치기", ["서비스센터에 연락해서 수리 접수하기 (모델명 스티커 사진 먼저 찍기)", "기사님 방문 날짜 잡고 캘린더에 넣기", "방문 전에 세탁기 주변 비워두기", "수리 받고 한 번 돌려서 확인하기"]], "mig1toilet": ["화장실 하수구 냄새 해결하기", ["냄새가 어느 배수구에서 나는지 확인하기", "배수구 덮개 열고 머리카락·찌꺼기 청소하기", "냄새 차단 트랩이나 탈취제 주문하기", "설치하고 다음 날 냄새 다시 확인하기"]], "mupo84mw31e2g": ["", ["지금 요금제랑 한 달 데이터 사용량 확인하기", "요금제 2~3개 골라 가격 비교하기", "약정·위약금 확인하고 요금제 변경 신청하기"]], "mumjb5em8mqm2": ["K-패스 모바일티머니 등록", ["Apple Pay에서 모바일 티머니 발급하기", "K-패스 누리집에 모바일 티머니 카드번호 등록하기", "기존 K-패스 카드 해제하기"]], "muex0f838ilv2": ["토스 자동이체 등록", ["자동이체 걸 항목·금액·날짜 정하기", "토스 앱에서 자동이체 등록하기", "첫 이체일에 잘 빠졌는지 확인하기"]], "muex0efx4i62n": ["텀블러 꽂이 사기", ["텀블러 꽂이 둘 자리 크기 재기", "마음에 드는 거 2~3개 골라 비교하기", "주문하기"]], "muewxs7gas1uh": ["", ["바탕화면 파일을 폴더로 모으기", "다운로드 폴더 비우기", "안 쓰는 프로그램 지우기", "중요한 파일 클라우드에 백업하기"]], "muewxsnhjya43": ["", ["배경으로 쓸 이미지 고르기", "화면 크기에 맞게 자르기", "배경화면으로 설정하기"]], "muewxr0l868hr": ["", ["올릴 영상이랑 썸네일 준비하기", "제목·소개·태그 쓰기", "빌리빌리에 업로드하기"]], "muewxrrm44ss8": ["", ["올릴 영상이랑 썸네일 준비하기", "제목·소개·태그 쓰기", "니코동에 업로드하기"]], "muf69e8ll15po": ["", ["고칠 부분 메모하기", "영상이나 설명 수정하기", "다시 올리고 잘 반영됐는지 확인하기"]], "mupab9wsiq2z5": ["", ["입고 싶은 의상 참고 사진 모으기", "갖고 있는 옷·소품이랑 맞춰보기", "새로 살 것 정리해서 살 것 목록에 넣기"]], "mupabauxi3wuh": ["", ["보정할 포카 사진 고르기", "밝기·색감 보정하기", "완성본 저장하기"]]};
