@@ -606,3 +606,11 @@ function syncAllTodos_() {
   });
   return cnt;
 }
+
+/* 한 번만 실행: 이제 안 쓰는 '姫の手帳 할일' 구글 캘린더를 통째로 지워요 (안에 있던 일정도 같이 사라져요) */
+function deleteTodoCalendar() {
+  const cals = CalendarApp.getOwnedCalendarsByName(TODO_CAL_NAME);
+  cals.forEach(c => c.deleteCalendar());
+  PropertiesService.getScriptProperties().deleteProperty('TODO_CAL_ID');
+  Logger.log(cals.length ? '지웠어요: ' + TODO_CAL_NAME : '이미 없어요');
+}
