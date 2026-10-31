@@ -1676,6 +1676,7 @@ function nowGate(){
     <div class="nsupp">${SUPPS.map(x=>`<button class="${suppDone(x,td)?"on":""}" data-nowsupp="${esc(x.id)}"><i>${suppDone(x,td)?"✓":""}</i>${esc(x.name)}<small>${esc(x.time||"")}</small></button>`).join("")}</div>
     <button class="nbig" data-nowskip>${n?"다 먹었어요":"나중에 먹을게요"}</button></div>`;
   }
+  return "";   // 아침·저녁 루틴 묻기는 껐어요
   const am=k==="am";
   if(!am){
     const out=lsGet("now:out:"+td);
@@ -1745,7 +1746,7 @@ function recMain(o){
   return `<div class="now1"><div class="nk">${o.today?"오늘 할 일 중 지금 하기 좋은 것":"언젠가 할 일에서 골랐어요"}</div>
   <p class="act">${r.par?`<span class="par">${esc(r.par)}</span>`:""}${esc(r.act)}</p>
   <div class="meta"><span>⏱ 약 ${minTxt(o.mins)}</span><span>${o.step?`전체 ${o.step.total}단계 중 ${o.step.n}단계`:"한 번에 끝나는 일"}</span>${o.t.important?`<span>★ 중요</span>`:""}</div>
-  <p class="why"><b>${esc(o.ctx)}</b>${o.why.length?" "+esc(o.why.join(" · ")):""}${cs?"":` <span class="savehint" style="display:block">컨디션 루틴에서 기운·시간을 고르면 거기에 맞춰 추천해요.</span>`}</p>
+  <p class="why"><b>${esc(o.ctx)}</b>${o.why.length?" "+esc(o.why.join(" · ")):""}</p>
   <div class="tbtns"><button class="tbtn pri" data-focus="${esc(o.t.id)}">▶ 지금 시작</button>
   ${o.today?`<button class="tbtn ok" data-recdone="${esc(o.t.id)}">완료했어요</button>`:`<button class="tbtn ok" data-recok="${esc(o.t.id)}">오늘 할 일로 선택</button>`}
   <button class="tbtn" data-recskip="${esc(o.t.id)}">오늘은 제외</button></div></div>`;
@@ -1759,7 +1760,7 @@ function recAlt(o){
 function recCard(){
   const L=recCands();
   if(!L.length)return `<div class="now1"><div class="nk">지금 추천할 일이 없어요</div><p class="why">오늘 할 일도, 언젠가 할 일도 비어 있어요. 쉬어도 되는 날이에요 🎀</p>
-    <div class="tbtns"><button class="tbtn" data-add="todo">할 일 추가</button><button class="tbtn" data-cond>컨디션 루틴</button></div></div>`;
+    <div class="tbtns"><button class="tbtn" data-add="todo">할 일 추가</button></div></div>`;
   const[a,...rest]=L,sd=rest.filter(o=>!o.today).length+(a.today?0:1);
   return recMain(a)+(rest.length?`<button class="hbtn recmore" data-recmore aria-expanded="${!!V.recMore}">${V.recMore?"다른 추천 접기":`다른 추천 ${rest.length}개 더 보기`}</button>
     ${V.recMore?`<div class="recalt">${rest.map(recAlt).join("")}${sd>=2?`<button class="hbtn" data-recall>언젠가 추천 ${sd}개 모두 오늘 할 일로 선택…</button>`:""}</div>`:""}`:"");
@@ -1816,8 +1817,7 @@ function vToday(){
     <div class="hcard">${evs.length?evs.map(evHome).join(""):`<div class="dempty">오늘 잡힌 일정이 없어요 <button data-add="event">일정 추가</button></div>`}</div></section>
   <section class="hsec" aria-labelledby="hTd"><h2 id="hTd">오늘 할 일 <small>${open.length}개${open.length?` · 약 ${minTxt(sumMins(open))}`:""}</small>${late?` <span class="late">${ic("bang")}${late}개 밀림</span>`:""}</h2>
     <div class="hcard">${open.length?open.map(duoTd).join(""):`<div class="dempty">${todos.length?"오늘 할 일 끝! 🎀":"아직 오늘 할 일이 없어요. 위 추천에서 골라 보세요."} <button data-add="todo">할 일 추가</button></div>`}${doneFold(todos.filter(t=>t.done),duoTd)}</div></section>
-  <section class="hsec" aria-labelledby="hRt"><h2 id="hRt">${slotName()} 루틴</h2>${nowGate()}${condBox()}
-    ${hb.length?`<div class="qh" role="group" aria-label="일상 루틴 오늘 체크 (${hb.filter(x=>x.log?.[td]).length}/${hb.length})">${hb.map(x=>`<button class="${x.log?.[td]?"on":""}" data-hday="${x.id}|${td}" aria-pressed="${!!x.log?.[td]}">${x.log?.[td]?"✓":"○"} ${esc(x.name)}</button>`).join("")}</div>`:""}</section>
+  ${(g=>g?`<section class="hsec" aria-label="지금 확인할 것">${g}</section>`:"")(nowGate())}
   <section class="hsec" aria-labelledby="hSh"><h2 id="hSh">살 것 <small>${shopLeft}개 남음</small></h2><div class="hcard">${shopHome()}</div></section>
   <section class="hsec" aria-labelledby="hCal"><h2 id="hCal">이번 달</h2>${calSummary()}</section>
   <section class="hsec" aria-labelledby="hSd"><h2 id="hSd">언젠가 할 일</h2>${somedaySummary()}</section>
